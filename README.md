@@ -177,10 +177,13 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.text }}` | Message text (for `type: text` messages) |
 | `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `sticker`, or `unsupported` |
 | `{{ $json.data.media.media_id }}` | ID to download file via `GET /api/v1/media/{media_id}` (Pro license) |
-| `{{ $json.data.media.kind }}` | Media kind: `image`, `audio`, `voice`, `video`, `document`, `sticker` |
-| `{{ $json.data.media.download_url }}` | Pre-built download URL (Pro license only) |
+| `{{ $json.data.media.voice }}` | `true` for WhatsApp voice messages (boolean, WA only; omitted for IG/FB) |
+| `{{ $json.data.media.download_url }}` | Authenticated download URL — fetch with your `X-API-Key`. `null` if download from Meta failed. **Cannot be used directly as `media_url` for outbound sends** — re-host the bytes first. |
 | `{{ $json.data.media.mime_type }}` | MIME type of the received file |
-| `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp (temp storage) |
+| `{{ $json.data.media.file_size }}` | File size in bytes |
+| `{{ $json.data.media.filename }}` | Original filename (documents only; `null` otherwise) |
+| `{{ $json.data.media.duration_ms }}` | Duration in ms (audio/video only; `null` otherwise) |
+| `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
 | `{{ $json.data.caption }}` | Caption text attached to the media (WhatsApp) |
 | `{{ $json.data.upgrade_required }}` | `"pro"` if channel lacks a Pro license for this message |
 
