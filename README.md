@@ -106,7 +106,7 @@ npm install n8n-nodes-fiwano
 
 ### Self-hosted Docker
 
-Build this package into a custom n8n image — no local `npm install` needed. See the [Docker setup guide](https://github.com/RomanBabakin/n8n-nodes-fiwano#self-hosted-docker).
+Build this package into a custom n8n image — no local `npm install` needed. See the [Docker setup guide](https://github.com/fiwano-com/n8n-nodes-fiwano#self-hosted-docker).
 
 ---
 
