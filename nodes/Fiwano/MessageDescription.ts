@@ -127,7 +127,7 @@ export const messageFields: INodeProperties[] = [
 			{
 				name: 'Document',
 				value: 'document',
-				description: 'WhatsApp and Facebook only',
+				description: 'WhatsApp, Instagram, Facebook',
 			},
 			{
 				name: 'Image',
