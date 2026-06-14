@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/RomanBabakin/n8n-nodes-fiwano"
+    "url": "https://github.com/fiwano-com/n8n-nodes-fiwano"
   },
   "main": "index.js",
   "scripts": {
