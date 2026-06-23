@@ -1,0 +1,184 @@
+{
+  "id": "fiwano-universal-auto-responder",
+  "name": "Fiwano — Universal Auto-Responder (WhatsApp + Instagram + Facebook)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Universal Auto-Responder\n### WhatsApp · Instagram · Facebook\n\n**One trigger, three channels.** A user messages any connected channel → instant reply. No per-channel code.\n\n- **Text** → echoed back.\n- **Anything else** (image, audio, video, document…) → a reply describing the attachment.\n\n### Before you start\n**Connect at least one channel first** — use the *Connect a Channel* workflow, or the [Fiwano portal](https://fiwano.com). The responder wires itself to channels you've already connected; with none connected, there's nothing to reply on.\n\n### Setup\n1. Add your **Fiwano API** credential to the Trigger and both reply nodes.\n2. *(Recommended)* Set a **Webhook Secret** on that **credential** — the Trigger uses it to verify incoming signatures. (The node's own Webhook Secret field is just an override; leave it empty to use the credential's.)\n3. **Save & Activate.**\n\n### What activation does\nThe Trigger is set to **Auto-Setup → All Active Channels**: on activation it points **every active channel** at this workflow at once — registering its webhook URL, the selected **Event Types**, and the credential's secret. Connect a channel later? Re-activate to wire it. Deactivating clears the webhook again.\n\nKeep **Event Types** on *Message Received*. n8n must be publicly reachable.\n\n[Docs](https://fiwano.com/documentation/n8n) · [Get an API key](https://fiwano.com)",
+        "height": 954,
+        "width": 504,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        192
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000001",
+      "name": "About this workflow"
+    },
+    {
+      "parameters": {
+        "autoSetup": "all"
+      },
+      "type": "n8n-nodes-fiwano.fiwanoTrigger",
+      "typeVersion": 1,
+      "position": [
+        128,
+        432
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000002",
+      "name": "Fiwano Trigger",
+      "webhookId": "fiwano-universal-responder",
+      "credentials": {
+        "fiwanoApi": {
+          "name": "Fiwano account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "is-text",
+              "leftValue": "={{ $json.data.type }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        400,
+        432
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000003",
+      "name": "Is it a text message?"
+    },
+    {
+      "parameters": {
+        "channelId": "={{ $json.channel_id }}",
+        "recipient": "={{ $json.data.from }}",
+        "text": "=You said: \"{{ $json.data.text }}\" 👋"
+      },
+      "type": "n8n-nodes-fiwano.fiwano",
+      "typeVersion": 1,
+      "position": [
+        688,
+        304
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000004",
+      "name": "Reply — text echo",
+      "credentials": {
+        "fiwanoApi": {
+          "name": "Fiwano account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channelId": "={{ $json.channel_id }}",
+        "recipient": "={{ $json.data.from }}",
+        "text": "=Got your {{ $json.data.type }} 📎 — {{ ($json.data.media || {}).mime_type || 'attachment' }}. Thanks!"
+      },
+      "type": "n8n-nodes-fiwano.fiwano",
+      "typeVersion": 1,
+      "position": [
+        688,
+        544
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000005",
+      "name": "Reply — attachment info",
+      "credentials": {
+        "fiwanoApi": {
+          "name": "Fiwano account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### 📥 What's in each message\n\nSame shape for all 3 channels (`$json` on the trigger):\n\n- `channel_id` — which channel\n- `data.from` — sender → use as reply recipient\n- `data.from_name` — name (WhatsApp only; `null` on IG/FB)\n- `data.type` — `text`, `image`, `audio`, `video`, `document`…\n- `data.text` — the text (when `type = text`)\n- `data.media` — `media_id`, `mime_type`, `file_size`, `filename`… (for media)",
+        "height": 370,
+        "width": 380,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        768
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000006",
+      "name": "Payload cheat-sheet"
+    },
+    {
+      "parameters": {
+        "content": "## 📎 Want to echo the file back?\n\nThe **attachment** reply just describes the file. To send the **actual file** back (a full media echo) you need a **Pro** license + object storage:\n\n1. **Fiwano → Media → Download** — pulls the file into n8n. (The inbound `download_url` is API-key-protected, so Meta can't fetch it directly.)\n2. **Re-host** it at a public/signed HTTPS URL — S3, GCS, Cloudflare R2, MinIO, Azure SAS… Meta fetches outbound media **by URL**, so this step is required.\n3. **Fiwano → Message → Send Media** with that URL.\n\nAdd those three nodes after the *attachment* branch when you need it.",
+        "height": 373,
+        "width": 516,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        688,
+        768
+      ],
+      "id": "bb2c0002-0002-4000-8000-000000000007",
+      "name": "Full media echo recipe"
+    }
+  ],
+  "connections": {
+    "Fiwano Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is it a text message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it a text message?": {
+      "main": [
+        [
+          {
+            "node": "Reply — text echo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply — attachment info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [],
+  "pinData": {}
+}

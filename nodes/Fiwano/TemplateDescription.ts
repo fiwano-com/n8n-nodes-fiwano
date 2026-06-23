@@ -161,6 +161,25 @@ export const templateFields: INodeProperties[] = [
 		},
 	},
 
+	// ── Update: Category ─────────────────────────────────────────────
+	{
+		displayName: 'Category',
+		name: 'updateCategory',
+		type: 'options',
+		options: [
+			{ name: 'Keep Current', value: '' },
+			{ name: 'Marketing', value: 'MARKETING' },
+			{ name: 'Utility', value: 'UTILITY' },
+			{ name: 'Authentication', value: 'AUTHENTICATION' },
+		],
+		default: '',
+		description:
+			'Change the template category. Meta only permits this for REJECTED or PAUSED templates; for an APPROVED template leave it as "Keep Current".',
+		displayOptions: {
+			show: { resource: ['template'], operation: ['update'] },
+		},
+	},
+
 	// ── Create: Parameter Format ─────────────────────────────────────
 	{
 		displayName: 'Parameter Format',

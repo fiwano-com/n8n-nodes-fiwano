@@ -67,11 +67,12 @@ Ready-to-import workflows are in the [`workflows/`](./workflows/) directory:
 
 | File | Description |
 |------|-------------|
-| `fiwano-complete-demo.json` | 9-section demo covering every operation: Echo Bot with profile enrichment (live trigger), channel management, template CRUD, text & template messaging, redirect URI management |
+| `fiwano-connect-channels.json` | **Step 1 — connect.** Connect channels one at a time: pick a channel type, generate a Meta setup link, and a webhook callback auto-exchanges the returned code for a `channel_id` — no copy-pasting codes. (Or connect in the [Fiwano portal](https://fiwano.com).) |
+| `fiwano-universal-auto-responder.json` | **Step 2 — auto-reply.** One trigger answers **every** message on WhatsApp, Instagram and Facebook — echoes text, and replies to attachments with file details. Includes a sticky recipe for a full media echo. **Needs at least one connected channel** (do Step 1 first, or connect in the portal). |
 
 Import via n8n UI: **Workflows → (menu) → Import → select file**, or via CLI:
 ```bash
-n8n import:workflow --input=workflows/fiwano-complete-demo.json
+n8n import:workflow --input=workflows/fiwano-universal-auto-responder.json
 ```
 
 ---
@@ -114,18 +115,21 @@ Build this package into a custom n8n image — no local `npm install` needed. Se
 
 1. [Sign up at fiwano.com](https://fiwano.com/auth/login) and create an API key in **API Keys**
 2. In n8n: **Credentials → Add → Fiwano API** → paste the key (starts with `mip_live_`)
+3. *(Optional)* Set a **Webhook Secret** on the credential to reuse one HMAC secret across all workflows — the trigger and the **Exchange OAuth Code** / **Update Webhook** operations fall back to it when their own secret field is empty.
 
-All Fiwano action nodes use this credential. The trigger node does not need credentials (it only verifies the webhook signature you configure per-channel).
+All Fiwano action nodes use this credential. The **Fiwano Trigger** node works without credentials in manual mode (it only verifies the webhook signature you configure per-channel). Add the same credential to the trigger **only** if you want it to auto-register its webhook on your channels — see [Setting Up the Trigger](#setting-up-the-trigger-webhooks).
 
 ---
 
 ## Connecting a Channel
 
+The easiest ways to connect a channel are the **Connect a Channel** [example workflow](#example-workflows) or the [Fiwano portal](https://fiwano.com) UI. To wire it manually with nodes:
+
 Channels are connected via Facebook OAuth. You do this once per channel (WhatsApp number / Instagram account / Facebook page).
 
 1. Add a **Fiwano** node → Resource: **Channel** → Operation: **Generate OAuth URL**
    - Select channel type, provide your redirect URI (must be registered via **Redirect URI → Add**)
-   - Run the node → copy the `oauth_url` from the output
+   - Run the node → copy the `setup_url` from the output
 2. Open that URL in a browser and authorize the page(s)
 3. Add another **Fiwano** node → **Channel → Exchange OAuth Code**
    - Paste the `code` from the redirect URL query parameter
@@ -138,7 +142,23 @@ Alternatively, manage everything from the [Fiwano portal](https://fiwano.com) UI
 
 ## Setting Up the Trigger (Webhooks)
 
-The **Fiwano Trigger** node starts a workflow when a message arrives on your channel.
+The **Fiwano Trigger** node starts a workflow when a message arrives on your channel. There are two ways to wire it up.
+
+### Option A — Automatic setup (recommended)
+
+Let the trigger register its own webhook on your channel(s).
+
+1. Add **Fiwano Trigger** and add your **Fiwano API** credential to it (needed for the auto modes — they error at activation if it's missing)
+2. Set **Webhook Auto-Setup**:
+   - **All Active Channels** — wire every connected channel (WhatsApp + Instagram + Facebook) that isn't already pointing elsewhere to this one trigger. One flow, three platforms.
+   - **Specific Channel** — register on a single **Channel ID** (takes it over even if it already has a webhook).
+3. Choose **Event Types** (these become each channel's `webhook_events`)
+4. *(Recommended)* Set a **Webhook Secret** to verify incoming signatures — preferably on the **credential** (reused everywhere; see [Credentials](#credentials)). The trigger's own Webhook Secret field overrides it.
+5. **Save and activate** the workflow — the trigger PATCHes the channel(s) with its webhook URL, events, and secret. Deactivating clears the webhook URL again (in "All" mode, only on channels still pointing at this trigger).
+
+### Option B — Manual setup
+
+Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
 
 1. Create a workflow, add **Fiwano Trigger**, choose event types (default: `message.received`)
 2. **Save and activate** the workflow — n8n assigns a permanent webhook URL
@@ -151,6 +171,15 @@ The **Fiwano Trigger** node starts a workflow when a message arrives on your cha
 6. Re-save the workflow
 
 > **n8n must be publicly accessible.** Fiwano delivers webhooks over the internet. Local `localhost` won't work — use a reverse proxy, ngrok, or n8n Cloud.
+
+> **Event filter vs. channel subscription.** The trigger's **Event Types** filter is applied on the n8n side. In automatic setup it is also used as the channel's `webhook_events`; in manual setup make sure the events you enable on the channel match what the trigger expects.
+
+> **When auto-setup runs.** Only on workflow **activation / deactivation** (and when n8n restarts active workflows) — never per message, so it adds no per-message overhead.
+>
+> - **Non-destructive, and silent about it.** "All Active Channels" only wires channels that aren't already pointing somewhere else; a channel wired to another URL is left alone — **and the workflow still activates without an error**. So if one channel isn't responding, check whether its webhook points elsewhere. To take a channel over deliberately, clear its webhook or use **Specific Channel**.
+> - **Deactivating removes the webhook** from the channels pointing at this trigger — it clears the webhook URL only, it does not delete the channel, messages, or any data. Fiwano keeps storing inbound messages while deactivated but won't relay them; reactivate to resume.
+> - **Clean up before removing.** Deactivate the workflow (don't just delete it, and don't remove the credential first) so the trigger can clear the webhook. If cleanup can't run, a channel keeps pointing at an inactive n8n URL and Fiwano will log delivery failures and email you until you clear it (via **Update Webhook** or the portal).
+> - Connect a new channel after activating? Re-activate the workflow so it gets wired.
 
 ### Webhook Payload Structure
 
@@ -244,7 +273,7 @@ Supported types per channel:
 | image | ✓ | ✓ | ✓ |
 | audio | ✓ | ✓ | ✓ |
 | video | ✓ | ✓ | ✓ |
-| document | ✓ | — | ✓ (as file) |
+| document | ✓ | ✓ | ✓ (as file) |
 
 **Handling errors.** On Meta-side failure the response carries `success: false` and `error_code` (Meta error code) — branch on it in your workflow:
 
@@ -293,6 +322,7 @@ Add **Contact → Get Profile** (Channel ID: `$json.channel_id`, User ID: `$json
 
 - [fiwano.com](https://fiwano.com) — product page & free trial
 - [API Documentation](https://fiwano.com/documentation)
+- [Fiwano Cookbook](https://github.com/fiwano-com/fiwano-cookbook) — step-by-step guide for integrating the API directly in code (handy for AI coding agents)
 - [Portal](https://fiwano.com/auth/login)
 
 ## License

@@ -151,7 +151,11 @@ async function executeChannel(
 		const extra = this.getNodeParameter('additionalFields', i) as IDataObject;
 		const body: IDataObject = { code };
 		if (extra.webhook_url) body.webhook_url = extra.webhook_url;
-		if (extra.webhook_secret) body.webhook_secret = extra.webhook_secret;
+		// Secret: the explicit field wins; otherwise fall back to the credential's
+		// default Webhook Secret when a webhook URL is being configured.
+		const exSecret = (extra.webhook_secret as string)
+			|| (extra.webhook_url ? await credentialWebhookSecret.call(this) : '');
+		if (exSecret) body.webhook_secret = exSecret;
 		if (extra.webhook_events && (extra.webhook_events as string[]).length > 0) {
 			body.webhook_events = extra.webhook_events;
 		}
@@ -162,7 +166,11 @@ async function executeChannel(
 		const fields = this.getNodeParameter('updateFields', i) as IDataObject;
 		const body: IDataObject = {};
 		if (fields.webhook_url) body.webhook_url = fields.webhook_url;
-		if (fields.webhook_secret) body.webhook_secret = fields.webhook_secret;
+		// Secret: the explicit field wins; otherwise fall back to the credential's
+		// default Webhook Secret when a webhook URL is being configured.
+		const upSecret = (fields.webhook_secret as string)
+			|| (fields.webhook_url ? await credentialWebhookSecret.call(this) : '');
+		if (upSecret) body.webhook_secret = upSecret;
 		if (fields.webhook_events) body.webhook_events = fields.webhook_events;
 		return fiwanoApiRequest.call(this, 'PATCH', `/channels/${channelId}`, body);
 	}
@@ -303,11 +311,16 @@ async function executeTemplate(
 				{ itemIndex: i },
 			);
 		}
+		const updateCategory = this.getNodeParameter('updateCategory', i, '') as string;
+		const updateBody: IDataObject = { components: components as IDataObject[] };
+		if (updateCategory) {
+			updateBody.category = updateCategory;
+		}
 		return fiwanoApiRequest.call(
 			this,
 			'PUT',
 			`/channels/${channelId}/templates/${templateId}`,
-			{ components: components as IDataObject[] },
+			updateBody,
 		);
 	}
 
@@ -362,4 +375,19 @@ async function executeRedirect(
 		return fiwanoApiRequest.call(this, 'DELETE', `/redirects/${redirectId}`);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown redirect operation: ${operation}`);
+}
+
+/**
+ * Read the optional default Webhook Secret stored on the Fiwano API credential.
+ * Returns '' when no credential is attached or the field is empty. Used so the
+ * Exchange OAuth Code / Update Webhook operations can fall back to a single
+ * account-wide secret instead of requiring it on every node.
+ */
+async function credentialWebhookSecret(this: IExecuteFunctions): Promise<string> {
+	try {
+		const cred = await this.getCredentials('fiwanoApi');
+		return (((cred?.webhookSecret as string) || '')).trim();
+	} catch {
+		return '';
+	}
 }

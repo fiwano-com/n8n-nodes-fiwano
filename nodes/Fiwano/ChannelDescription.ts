@@ -23,7 +23,7 @@ export const channelOperations: INodeProperties = {
 			name: 'Generate OAuth URL',
 			value: 'setupUrl',
 			action: 'Generate an OAuth setup URL',
-			description: 'Generate a Facebook Login URL to connect a new channel (valid 10 min)',
+			description: 'Generate a setup URL to connect a new channel (WhatsApp Embedded Signup or Meta OAuth; valid up to 60 min)',
 		},
 		{
 			name: 'Get',
