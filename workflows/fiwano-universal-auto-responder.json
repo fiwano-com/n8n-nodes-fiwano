@@ -29,13 +29,7 @@
         432
       ],
       "id": "bb2c0002-0002-4000-8000-000000000002",
-      "name": "Fiwano Trigger",
-      "webhookId": "fiwano-universal-responder",
-      "credentials": {
-        "fiwanoApi": {
-          "name": "Fiwano account"
-        }
-      }
+      "name": "Fiwano Trigger"
     },
     {
       "parameters": {
@@ -83,12 +77,7 @@
         304
       ],
       "id": "bb2c0002-0002-4000-8000-000000000004",
-      "name": "Reply — text echo",
-      "credentials": {
-        "fiwanoApi": {
-          "name": "Fiwano account"
-        }
-      }
+      "name": "Reply — text echo"
     },
     {
       "parameters": {
@@ -103,12 +92,7 @@
         544
       ],
       "id": "bb2c0002-0002-4000-8000-000000000005",
-      "name": "Reply — attachment info",
-      "credentials": {
-        "fiwanoApi": {
-          "name": "Fiwano account"
-        }
-      }
+      "name": "Reply — attachment info"
     },
     {
       "parameters": {

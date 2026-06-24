@@ -137,13 +137,12 @@ export class FiwanoTrigger implements INodeType {
 					'Which event types this trigger processes. In auto-setup mode the same selection is registered as the channel\'s webhook_events; events invalid for a channel type are ignored by Fiwano. Leave empty to process (and, in auto-setup, subscribe to) all event types.',
 			},
 			{
-				displayName: 'Setup Instructions',
+				displayName:
+					'Manual mode: set this node\'s Production URL (Webhook URLs, above) as the channel\'s webhook — in the Fiwano portal, or with the Fiwano node\'s "Update Webhook" operation — and use the same Webhook Secret on both sides. Prefer automatic wiring? Switch Auto-Setup to "All Active Channels".',
 				name: 'setupNotice',
 				type: 'notice',
 				default: '',
 				displayOptions: { show: { autoSetup: ['manual'] } },
-				description:
-					'Manual setup: copy the webhook URL above and set it as the webhook_url via the Fiwano "Exchange OAuth Code" or "Update Webhook" operation. Use the same secret in both places. Tip: switch Auto-Setup to "All Active Channels" (with a Fiwano credential) to wire every channel to this trigger automatically.',
 			},
 		],
 	};

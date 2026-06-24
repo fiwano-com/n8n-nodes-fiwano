@@ -4,7 +4,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Connect a Channel via API\n### WhatsApp · Instagram · Facebook\n\nConnect channels **one at a time**, right from n8n. Each run links one Meta account and returns its **`channel_id`**.\n\nThe workflow has two halves:\n- **▶ Get a setup link → Generate setup link** — asks Fiwano for a one-time `setup_url`.\n- **OAuth Callback → Exchange code** — after the user authorizes, Meta redirects back here with `?code=…`; *Exchange code* swaps it for a `channel_id` (single-use, valid 5 min) and shows the connected channel in the browser.\n\n### One-time setup\n1. Open **OAuth Callback** → the **Production URL** tab → copy that URL.\n   *(It's shown even while inactive — activating doesn't create the URL, it just makes the webhook listen.)*\n2. **Whitelist** that URL with Fiwano (it only redirects to approved URLs):\n   - **Portal:** API Keys → Allowed Redirect URIs → add it, **or**\n   - add a **Fiwano → Redirect URI → Add** node, set `uriPattern` to the URL, run once.\n3. Paste the same URL into **Generate setup link → Redirect URI**, and pick a **Channel Type**.\n4. **Activate** the workflow — now the callback is live to receive Meta's redirect.\n\n### Connect a channel\n1. Run **▶ Get a setup link** and open the returned **`setup_url`** in a browser.\n2. Authorize the Meta account → you're redirected back, the code is exchanged, and the connected **`channel_id`** is returned. ✅\n\nRepeat per channel.\n\n### Webhooks — now or later?\nIn **Exchange code → Additional Fields** you can set the channel's **Webhook URL**, **Secret** and **Events** here, so it receives messages the moment it connects. Or leave them empty and let the **Fiwano Trigger**'s *Auto-Setup* wire it — recommended with the **Universal Auto-Responder** template.\n\nn8n must be publicly reachable. You can also connect channels in the [Fiwano portal](https://fiwano.com).\n\n[Docs](https://fiwano.com/documentation/channels)",
+        "content": "## Connect a Channel via API\n### WhatsApp · Instagram · Facebook\n\nConnect channels **one at a time**, right from n8n. Each run links one Meta account and returns its **`channel_id`**.\n\nThe workflow has two halves:\n- **▶ Get a setup link → Generate setup link** — asks Fiwano for a one-time `setup_url`.\n- **OAuth Callback → Exchange code** — after the user authorizes, Meta redirects back here with `?code=…`; *Exchange code* swaps it for a `channel_id` (single-use, valid 5 min) and shows the connected channel in the browser.\n\n### One-time setup\n1. Add your **Fiwano API** credential to both Fiwano nodes — **Generate setup link** and **Exchange code → channel**.\n2. Open **OAuth Callback** → the **Production URL** tab → copy that URL.\n   *(It's shown even while inactive — activating doesn't create the URL, it just makes the webhook listen.)*\n3. **Whitelist** that URL with Fiwano (it only redirects to approved URLs):\n   - **Portal:** API Keys → Allowed Redirect URIs → add it, **or**\n   - add a **Fiwano → Redirect URI → Add** node, set `uriPattern` to the URL, run once.\n4. Paste the same URL into **Generate setup link → Redirect URI**, and pick a **Channel Type**.\n5. **Activate** the workflow — now the callback is live to receive Meta's redirect.\n\n### Connect a channel\n1. Run **▶ Get a setup link** and open the returned **`setup_url`** in a browser.\n2. Authorize the Meta account → you're redirected back, the code is exchanged, and the connected **`channel_id`** is returned. ✅\n\nRepeat per channel.\n\n### Webhooks — now or later?\nIn **Exchange code → Additional Fields** you can set the channel's **Webhook URL**, **Secret** and **Events** here, so it receives messages the moment it connects. Or leave them empty and let the **Fiwano Trigger**'s *Auto-Setup* wire it — recommended with the **Universal Auto-Responder** template.\n\nn8n must be publicly reachable. You can also connect channels in the [Fiwano portal](https://fiwano.com).\n\n[Docs](https://fiwano.com/documentation/channels)",
         "height": 1275,
         "width": 460,
         "color": 5
@@ -34,12 +34,7 @@
       "typeVersion": 1,
       "position": [360, 320],
       "id": "cc3d0003-0003-4000-8000-000000000003",
-      "name": "Generate setup link",
-      "credentials": {
-        "fiwanoApi": {
-          "name": "Fiwano account"
-        }
-      }
+      "name": "Generate setup link"
     },
     {
       "parameters": {
@@ -52,8 +47,7 @@
       "typeVersion": 2,
       "position": [140, 600],
       "id": "cc3d0003-0003-4000-8000-000000000004",
-      "name": "OAuth Callback",
-      "webhookId": "fiwano-oauth-callback"
+      "name": "OAuth Callback"
     },
     {
       "parameters": {
@@ -66,12 +60,7 @@
       "typeVersion": 1,
       "position": [360, 600],
       "id": "cc3d0003-0003-4000-8000-000000000005",
-      "name": "Exchange code → channel",
-      "credentials": {
-        "fiwanoApi": {
-          "name": "Fiwano account"
-        }
-      }
+      "name": "Exchange code → channel"
     }
   ],
   "connections": {

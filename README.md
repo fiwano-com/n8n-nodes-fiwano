@@ -4,14 +4,15 @@ n8n verified community node for **[Fiwano](https://fiwano.com)** — a unified m
 
 ## What is Fiwano?
 
-Fiwano is a verified Meta Tech Provider that abstracts the complexity of WhatsApp Cloud API, Instagram Messaging API, and Facebook Messenger API into a single, consistent REST API. Connect your Meta-verified business accounts once via simple Facebook auth — no Meta developer portal, no app setup, no individual channel verification required.
+Fiwano is a verified Meta Tech Provider that abstracts the complexity of WhatsApp Cloud API, Instagram Messaging API, and Facebook Messenger API into a single, consistent REST API. Connect your Meta-verified business accounts once via simple Facebook auth — no Meta developer portal, no app creation, no Meta app review.
+
+**Fiwano is a messaging API, not a full Meta platform API.** It does one thing well: receive inbound messages and send replies (plus WhatsApp templates) across WhatsApp, Instagram DM, and Messenger. It deliberately stays out of comments, posts, stories, ads, and page analytics — just conversations with people.
 
 Key benefits:
 - **Official Meta APIs only** — built on WhatsApp Cloud API, Instagram Messaging API and Facebook Messenger API. No browser automation, no unofficial client simulation, no account ban risk. Production-safe at any scale.
 - **One API for three channels** — identical request format across WhatsApp, Instagram DM, and Facebook Messenger
 - **Real-time webhooks** — incoming messages and delivery statuses delivered to your endpoint, HMAC-signed
 - **WhatsApp template management** — create, manage, and send approved templates directly from the API
-- **Auto token refresh** — Meta access tokens are refreshed automatically before expiry
 - **Secure by default** — tokens encrypted at rest, no message content stored on Fiwano's side
 
 Built for AI assistants, CRMs, helpdesks, and any product that needs conversational messaging at business scale.
@@ -61,20 +62,6 @@ The trigger starts your workflow for any of these events:
 
 Filter by event type in node settings. HMAC-SHA256 signature verification is built in.
 
-## Example Workflows
-
-Ready-to-import workflows are in the [`workflows/`](./workflows/) directory:
-
-| File | Description |
-|------|-------------|
-| `fiwano-connect-channels.json` | **Step 1 — connect.** Connect channels one at a time: pick a channel type, generate a Meta setup link, and a webhook callback auto-exchanges the returned code for a `channel_id` — no copy-pasting codes. (Or connect in the [Fiwano portal](https://fiwano.com).) |
-| `fiwano-universal-auto-responder.json` | **Step 2 — auto-reply.** One trigger answers **every** message on WhatsApp, Instagram and Facebook — echoes text, and replies to attachments with file details. Includes a sticky recipe for a full media echo. **Needs at least one connected channel** (do Step 1 first, or connect in the portal). |
-
-Import via n8n UI: **Workflows → (menu) → Import → select file**, or via CLI:
-```bash
-n8n import:workflow --input=workflows/fiwano-universal-auto-responder.json
-```
-
 ---
 
 ## Installation
@@ -107,7 +94,9 @@ npm install n8n-nodes-fiwano
 
 ### Self-hosted Docker
 
-Build this package into a custom n8n image — no local `npm install` needed. See the [Docker setup guide](https://github.com/fiwano-com/n8n-nodes-fiwano#self-hosted-docker).
+No custom image required — install Fiwano in-app via **Settings → Community Nodes** (or the nodes panel above). The package is stored in the n8n data volume, so keep `~/.n8n` (`/home/node/.n8n` in the official image) on a persistent volume and it survives restarts and upgrades.
+
+To bake it into a custom image instead, follow n8n's [community-node installation guide](https://docs.n8n.io/integrations/community-nodes/installation/).
 
 ---
 
@@ -123,16 +112,19 @@ All Fiwano action nodes use this credential. The **Fiwano Trigger** node works w
 
 ## Connecting a Channel
 
-The easiest ways to connect a channel are the **Connect a Channel** [example workflow](#example-workflows) or the [Fiwano portal](https://fiwano.com) UI. To wire it manually with nodes:
+Two ways to connect a channel — pick based on **whose** channel it is:
 
-Channels are connected via Facebook OAuth. You do this once per channel (WhatsApp number / Instagram account / Facebook page).
+- **Your own channels** → the [Fiwano portal](https://fiwano.com) UI (no code). Simplest when you just need your own WhatsApp / Instagram / Facebook in your automation.
+- **Your customers' channels** → the API (the nodes below, or the [Connect a Channel workflow](#example-workflows)). This embeds a "connect your channel" step into your own product, so an external client authorizes their own Meta account through *your* interface — they never need a Fiwano account.
+
+The API flow is Facebook OAuth, run once per channel (WhatsApp number / Instagram account / Facebook Page):
 
 1. Add a **Fiwano** node → Resource: **Channel** → Operation: **Generate OAuth URL**
    - Select channel type, provide your redirect URI (must be registered via **Redirect URI → Add**)
    - Run the node → copy the `setup_url` from the output
 2. Open that URL in a browser and authorize the page(s)
 3. Add another **Fiwano** node → **Channel → Exchange OAuth Code**
-   - Paste the `code` from the redirect URL query parameter
+   - Paste the `code` from the redirect URL query parameter — it is single-use and short-lived, so exchange it promptly
    - Optionally set `webhook_url` and `webhook_secret` in Additional Fields
 4. The response contains `channel_id` — save it for all subsequent nodes
 
@@ -162,10 +154,10 @@ Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
 
 1. Create a workflow, add **Fiwano Trigger**, choose event types (default: `message.received`)
 2. **Save and activate** the workflow — n8n assigns a permanent webhook URL
-3. Copy the webhook URL from the node header (format: `https://your-n8n.example.com/webhook/<uuid>`)
-4. In the **Fiwano** node → **Channel → Update Webhook**, set:
+3. Open the **Fiwano Trigger** node and copy its **Production URL** (format: `https://your-n8n.example.com/webhook/<uuid>`)
+4. In a **Fiwano** node → **Channel → Update Webhook**, set the fields below, then execute the node once:
    - `channel_id` — your channel
-   - `webhook_url` — the URL from step 3
+   - `webhook_url` — the Production URL from step 3
    - Leave `webhook_secret` empty to auto-generate one, or provide your own
 5. The response includes `webhook_secret` — copy it into the **Webhook Secret** field in the Trigger node
 6. Re-save the workflow
@@ -315,6 +307,29 @@ Add **Contact → Get Profile** (Channel ID: `$json.channel_id`, User ID: `$json
 
 **Filter by channel type:**
 `IF → $json.channel_type === 'whatsapp'`
+
+---
+
+## Example Workflows
+
+Two ready-made flows live in the [`workflows/`](./workflows/) directory. They assemble the pieces above (credential → channel → trigger → send), so you can import one and skip the manual wiring.
+
+| File | Description |
+|------|-------------|
+| `fiwano-connect-channels.json` | **Connect channels via the API** *(optional)*. Only needed if you onboard channels **programmatically** — e.g. connecting your own clients' channels. If connecting from the [Fiwano portal](https://fiwano.com) UI is enough for you, you don't need this. Connects one channel at a time: pick a channel type, generate a Meta setup link, and a webhook callback auto-exchanges the returned code for a `channel_id` — no copy-pasting codes. |
+| `fiwano-universal-auto-responder.json` | **Auto-reply to every message.** One trigger answers **every** message on WhatsApp, Instagram and Facebook — echoes text, and replies to attachments with file details. Includes a sticky recipe for a full media echo. **Needs at least one connected channel** — connect in the [portal](https://fiwano.com), or with the workflow above. |
+
+**Import (works on any n8n, including Cloud):** create a new workflow → **⋮ menu → Import from File** → select the `.json`.
+
+**After importing, finish setup before the workflow will run:**
+1. Add your **Fiwano API** credential to the nodes that use it (see [Credentials](#credentials)).
+2. For `fiwano-connect-channels.json`, add the OAuth-callback node's **Production URL** to your whitelisted redirect URIs (**Redirect URI → Add**, or in the [portal](https://fiwano.com)).
+3. **Activate** the workflow — the trigger and the OAuth-callback webhook only fire while the workflow is active.
+
+On **self-hosted** n8n you can also import from the command line, run on the machine where n8n is installed (the `--input` path is relative to your current directory; the workflow is imported **inactive** — activate it in the UI afterwards):
+```bash
+n8n import:workflow --input=workflows/fiwano-universal-auto-responder.json
+```
 
 ---
 

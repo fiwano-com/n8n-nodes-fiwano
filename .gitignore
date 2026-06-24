@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.js.map
 NOTES.md
+.DS_Store
