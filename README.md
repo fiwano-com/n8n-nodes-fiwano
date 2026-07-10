@@ -34,7 +34,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 
 | Node | Type | Description |
 |------|------|-------------|
-| **Fiwano** | Action | Send messages, manage channels, WhatsApp templates, contact profile enrichment, redirect URIs |
+| **Fiwano** | Action | Send messages, manage channels, check subscriptions and available slots, WhatsApp templates, contact profile enrichment, redirect URIs |
 | **Fiwano Trigger** | Webhook Trigger | Receive incoming messages and delivery status webhooks |
 
 ### Action node — operations
@@ -47,6 +47,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
 | Redirect URI | Get Many, Add, Delete |
+| Subscription | Get Many (subscriptions, assigned channels, available slots by channel type and tier) |
 
 ### Trigger node — events
 

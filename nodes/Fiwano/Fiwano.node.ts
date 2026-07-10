@@ -14,6 +14,7 @@ import { templateOperations, templateFields } from './TemplateDescription';
 import { contactOperations, contactFields } from './ContactDescription';
 import { redirectOperations, redirectFields } from './RedirectDescription';
 import { mediaOperations, mediaFields } from './MediaDescription';
+import { subscriptionOperations, subscriptionFields } from './SubscriptionDescription';
 
 export class Fiwano implements INodeType {
 	description: INodeTypeDescription = {
@@ -41,6 +42,7 @@ export class Fiwano implements INodeType {
 					{ name: 'Media', value: 'media' },
 					{ name: 'Message', value: 'message' },
 					{ name: 'Redirect URI', value: 'redirect' },
+					{ name: 'Subscription', value: 'subscription' },
 					{ name: 'Template', value: 'template' },
 				],
 				default: 'message',
@@ -51,12 +53,14 @@ export class Fiwano implements INodeType {
 			contactOperations,
 			redirectOperations,
 			mediaOperations,
+			subscriptionOperations,
 			...channelFields,
 			...messageFields,
 			...templateFields,
 			...contactFields,
 			...redirectFields,
 			...mediaFields,
+			...subscriptionFields,
 		],
 	};
 
@@ -95,6 +99,8 @@ export class Fiwano implements INodeType {
 					responseData = await executeContact.call(this, operation, i);
 				} else if (resource === 'redirect') {
 					responseData = await executeRedirect.call(this, operation, i);
+				} else if (resource === 'subscription') {
+					responseData = await executeSubscription.call(this, operation);
 				} else {
 					throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);
 				}
@@ -179,6 +185,18 @@ async function executeChannel(
 		return fiwanoApiRequest.call(this, 'DELETE', `/channels/${channelId}`);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown channel operation: ${operation}`);
+}
+
+// ── Subscription ─────────────────────────────────────────────────────────────
+
+async function executeSubscription(
+	this: IExecuteFunctions,
+	operation: string,
+): Promise<IDataObject> {
+	if (operation === 'getAll') {
+		return fiwanoApiRequest.call(this, 'GET', '/subscriptions');
+	}
+	throw new NodeOperationError(this.getNode(), `Unknown subscription operation: ${operation}`);
 }
 
 // ── Message ──────────────────────────────────────────────────────────────────
