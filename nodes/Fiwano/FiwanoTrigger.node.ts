@@ -10,6 +10,7 @@ import {
 	NodeApiError,
 	NodeOperationError,
 } from 'n8n-workflow';
+import { FIWANO_CLIENT_HEADER_VALUE } from './GenericFunctions';
 
 const BASE_URL = 'https://fiwano.com/api/v1';
 
@@ -79,7 +80,7 @@ export class FiwanoTrigger implements INodeType {
 				],
 				default: 'manual',
 				description:
-					'How this trigger\'s webhook URL gets registered on your Fiwano channel(s). "All Active Channels" and "Specific Channel" require a Fiwano API credential and register/unregister automatically when the workflow is (de)activated.',
+					'How this trigger\'s webhook URL gets registered on your Fiwano channel(s). "All Active Channels" and "Specific Channel" require a Fiwano API credential plus an externally reachable HTTPS Production URL (configure n8n WEBHOOK_URL when self-hosted), and register/unregister automatically when the workflow is (de)activated.',
 			},
 			{
 				displayName: 'Channel ID',
@@ -171,6 +172,9 @@ export class FiwanoTrigger implements INodeType {
 				try {
 					const url = this.getNodeWebhookUrl('default');
 					if (!url) return false;
+					// An invalid legacy URL must not make an already-wired channel look
+					// healthy and skip create(), where the actionable error is surfaced.
+					assertAutoSetupWebhookUrl(this, url);
 
 					if (mode === 'channel') {
 						const channelId = (this.getNodeParameter('channelId', '') as string).trim();
@@ -212,6 +216,7 @@ export class FiwanoTrigger implements INodeType {
 						'Could not resolve the webhook URL for auto-setup. Save and activate the workflow, or use Manual setup.',
 					);
 				}
+				assertAutoSetupWebhookUrl(this, url);
 
 				const events = this.getNodeParameter('events', []) as string[];
 				const secret = await resolveWebhookSecret(this);
@@ -394,6 +399,38 @@ function hasEvents(channel: IDataObject): boolean {
 }
 
 /**
+ * Reject an obviously local/non-TLS n8n Production URL before auto-setup sends
+ * it to Fiwano. This is intentionally a local, activation-time check only: it
+ * does not probe DNS or the network and adds no per-webhook overhead.
+ */
+function assertAutoSetupWebhookUrl(ctx: IHookFunctions, value: string): void {
+	let parsed: URL;
+	try {
+		parsed = new URL(value);
+	} catch {
+		throw new NodeOperationError(
+			ctx.getNode(),
+			'Webhook Auto-Setup could not parse n8n\'s Production URL. Configure WEBHOOK_URL with an externally reachable HTTPS URL, restart n8n, or use Manual setup.',
+		);
+	}
+
+	const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+	const ipv4Parts = host.split('.');
+	const isIpv4Loopback = ipv4Parts.length === 4
+		&& ipv4Parts.every((part) => /^\d{1,3}$/.test(part))
+		&& Number(ipv4Parts[0]) === 127;
+	const isLoopback = host === 'localhost' || host === '::1' || isIpv4Loopback;
+
+	if (parsed.protocol !== 'https:' || isLoopback) {
+		const reason = isLoopback ? 'localhost or a loopback address was detected' : 'HTTP is not supported';
+		throw new NodeOperationError(
+			ctx.getNode(),
+			`Webhook Auto-Setup requires an externally reachable HTTPS Production URL (${reason}). Configure n8n WEBHOOK_URL, restart n8n, or switch Webhook Auto-Setup to Manual.`,
+		);
+	}
+}
+
+/**
  * Resolve the webhook secret: the trigger's own Webhook Secret field wins; if it
  * is empty, fall back to the `webhookSecret` stored on the Fiwano API credential
  * (if a credential is attached). Returns '' when neither is set.
@@ -425,7 +462,10 @@ async function fiwanoHookRequest(
 	const options: IHttpRequestOptions = {
 		method,
 		url: `${BASE_URL}${path}`,
-		headers: { 'Content-Type': 'application/json' },
+		headers: {
+			'Content-Type': 'application/json',
+			'X-Fiwano-Client': FIWANO_CLIENT_HEADER_VALUE,
+		},
 		json: true,
 	};
 	if (body && Object.keys(body).length > 0) {

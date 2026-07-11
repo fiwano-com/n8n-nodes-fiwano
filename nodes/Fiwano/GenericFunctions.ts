@@ -12,6 +12,7 @@ export interface MediaDownloadResult {
 }
 
 const BASE_URL = 'https://fiwano.com/api/v1';
+export const FIWANO_CLIENT_HEADER_VALUE = 'n8n-nodes-fiwano';
 
 /**
  * Make an authenticated request to the Fiwano API.
@@ -28,7 +29,10 @@ export async function fiwanoApiRequest(
 	const options: IHttpRequestOptions = {
 		method: method as IHttpRequestOptions['method'],
 		url: `${BASE_URL}${path}`,
-		headers: { 'Content-Type': 'application/json' },
+		headers: {
+			'Content-Type': 'application/json',
+			'X-Fiwano-Client': FIWANO_CLIENT_HEADER_VALUE,
+		},
 	};
 
 	if (body && Object.keys(body).length > 0) {
@@ -61,6 +65,7 @@ export async function fiwanoApiRequestBinary(
 	const options: IHttpRequestOptions = {
 		method: 'GET',
 		url: `${BASE_URL}/media/${mediaId}`,
+		headers: { 'X-Fiwano-Client': FIWANO_CLIENT_HEADER_VALUE },
 		encoding: 'arraybuffer',
 		returnFullResponse: true,
 	};

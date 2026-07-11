@@ -149,6 +149,18 @@ Let the trigger register its own webhook on your channel(s).
 4. *(Recommended)* Set a **Webhook Secret** to verify incoming signatures — preferably on the **credential** (reused everywhere; see [Credentials](#credentials)). The trigger's own Webhook Secret field overrides it.
 5. **Save and activate** the workflow — the trigger PATCHes the channel(s) with its webhook URL, events, and secret. Deactivating clears the webhook URL again (in "All" mode, only on channels still pointing at this trigger).
 
+Auto-setup requires n8n's **Production URL** to use HTTPS and not point to
+`localhost`, `127.0.0.0/8`, or `::1`. If n8n resolves an HTTP or loopback
+Production URL, activation stops before changing any Fiwano channel and tells
+you to configure `WEBHOOK_URL`, restart n8n, or use Manual setup. A domain that
+merely contains the word `localhost` (for example `localhost.example.com`) is
+not treated as localhost.
+
+Official Fiwano nodes identify their API calls with a non-authentication client
+marker so channel webhook changes made by auto-setup can be distinguished from
+Portal and custom API changes in the Fiwano audit log. API-key authentication is
+unchanged.
+
 ### Option B — Manual setup
 
 Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
