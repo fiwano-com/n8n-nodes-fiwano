@@ -29,7 +29,7 @@ export class FiwanoTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Fiwano Trigger',
 		name: 'fiwanoTrigger',
-		icon: 'file:fiwano.svg',
+		icon: { light: 'file:fiwano.svg', dark: 'file:fiwano.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		description:

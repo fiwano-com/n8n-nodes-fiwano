@@ -9,7 +9,10 @@ import {
 export class FiwanoApi implements ICredentialType {
 	name = 'fiwanoApi';
 	displayName = 'Fiwano API';
-	icon: Icon = 'file:../nodes/Fiwano/fiwano.svg';
+	icon: Icon = {
+		light: 'file:../nodes/Fiwano/fiwano.svg',
+		dark: 'file:../nodes/Fiwano/fiwano.dark.svg',
+	};
 	// `-miscased` wants a camelCase slug, which is right for n8n's own credentials
 	// (they point at n8n doc pages). A community node must link to its live external
 	// docs — that is an n8n verification requirement — so the two rules conflict here

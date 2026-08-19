@@ -23,7 +23,7 @@ export class Fiwano implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Fiwano',
 		name: 'fiwano',
-		icon: 'file:fiwano.svg',
+		icon: { light: 'file:fiwano.svg', dark: 'file:fiwano.dark.svg' },
 		group: ['output'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',

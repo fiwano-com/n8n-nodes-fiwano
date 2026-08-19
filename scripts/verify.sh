@@ -105,7 +105,9 @@ console.log("   no runtime deps; n8n-workflow is a peer dep; keyword present");
 # 8. The icon is copied by the build, not by npm — a missing file means every
 #    node renders blank in the panel.
 gate "Packaged assets" bash -c '
-test -f dist/nodes/Fiwano/fiwano.svg || { echo "   dist/nodes/Fiwano/fiwano.svg missing"; exit 1; }
+for svg in fiwano.svg fiwano.dark.svg; do
+  test -f "dist/nodes/Fiwano/$svg" || { echo "   dist/nodes/Fiwano/$svg missing"; exit 1; }
+done
 node -e "
 const p=require(\"./package.json\");
 for (const f of [...p.n8n.nodes, ...p.n8n.credentials]) {

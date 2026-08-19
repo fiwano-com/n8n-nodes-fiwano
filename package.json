@@ -22,7 +22,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "build": "tsc && cp -r nodes/Fiwano/fiwano.svg dist/nodes/Fiwano/",
+    "build": "tsc && cp nodes/Fiwano/*.svg dist/nodes/Fiwano/",
     "dev": "tsc --watch",
     "lint": "eslint nodes credentials --ext .ts",
     "prepublishOnly": "npm run build"
