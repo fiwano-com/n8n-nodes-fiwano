@@ -93,7 +93,7 @@ export const templateFields: INodeProperties[] = [
 				description: 'Filter templates by approval status',
 			},
 			{
-				displayName: 'Sync from Meta',
+				displayName: 'Sync From Meta',
 				name: 'sync',
 				type: 'boolean',
 				default: true,
@@ -192,7 +192,7 @@ export const templateFields: INodeProperties[] = [
 				description: 'Variables referenced by index',
 			},
 			{
-				name: 'Named ({{customer_name}})',
+				name: 'Named ({{Customer_name}})',
 				value: 'named',
 				description: 'Variables referenced by name',
 			},

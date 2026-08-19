@@ -22,8 +22,8 @@ export const redirectOperations: INodeProperties = {
 		{
 			name: 'Get Many',
 			value: 'getAll',
-			action: 'Get many redirect URIs',
-			description: 'List all allowed OAuth redirect URIs for your API key',
+			action: 'Get many redirects',
+			description: 'List many allowed OAuth redirect URIs for your API key',
 		},
 	],
 	default: 'getAll',
@@ -38,7 +38,12 @@ export const redirectFields: INodeProperties[] = [
 		default: '',
 		required: true,
 		placeholder: 'https://yourapp.com/callback',
-		description: 'HTTPS URL or wildcard pattern (e.g. https://*.example.com/callback)',
+		description:
+			'HTTPS URL or wildcard pattern (e.g. https://*.example.com/callback). ' +
+			'An exact URI is safest. Explicit ports 1-65535 are supported; loopback addresses are not. ' +
+			'A wildcard may cover the path/query or one complete left-most hostname label, but cannot replace ' +
+			'the whole hostname, part of a label, or the port. Embedded credentials, URL fragments, and the ' +
+			'reserved query keys code, status, channel_type and error are rejected.',
 		displayOptions: {
 			show: { resource: ['redirect'], operation: ['add'] },
 		},

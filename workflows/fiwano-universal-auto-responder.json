@@ -96,35 +96,35 @@
     },
     {
       "parameters": {
-        "content": "### 📥 What's in each message\n\nSame shape for all 3 channels (`$json` on the trigger):\n\n- `channel_id` — which channel\n- `data.from` — sender → use as reply recipient\n- `data.from_name` — name (WhatsApp only; `null` on IG/FB)\n- `data.type` — `text`, `image`, `audio`, `video`, `document`…\n- `data.text` — the text (when `type = text`)\n- `data.media` — `media_id`, `mime_type`, `file_size`, `filename`… (for media)",
-        "height": 370,
-        "width": 380,
+        "content": "### 📥 What's in each message\n\nSame shape for all 3 channels (`$json` on the trigger):\n\n- `channel_id` — which channel\n- `data.from` — sender → use as reply recipient\n- `data.from_name` — name (WhatsApp only; `null` on IG/FB)\n- `data.type` — a **closed set**, safe to switch on: `text`, `image`, `audio`, `video`, `document`, `sticker` (WhatsApp only, inbound only), `unsupported`\n- `data.text` — the text (when `type = text`)\n- `data.caption` — text sent *with* a file (all channels)\n- `data.media` — `media_id`, `mime_type`, `file_size`, `filename`… (for media)\n\n`unsupported` means no file is coming: `data.unsupported_type` says what Meta sent, and `data.upgrade_required` marks the cases a **Pro** licence would have delivered.\n\nEach attachment of an album arrives as its **own** execution.\n\n### ⚠️ Sends answer HTTP 200 even when they fail\nThe reply node stays green either way — the outcome is in `success` and `status` (`sent` / `queued` / `failed`). Branch on `{{ $json.success }}` if a failed reply must be noticed.",
+        "height": 626,
+        "width": 668,
         "color": 4
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        160,
-        768
+        1232,
+        496
       ],
       "id": "bb2c0002-0002-4000-8000-000000000006",
       "name": "Payload cheat-sheet"
     },
     {
       "parameters": {
-        "content": "## 📎 Want to echo the file back?\n\nThe **attachment** reply just describes the file. To send the **actual file** back (a full media echo) you need a **Pro** license + object storage:\n\n1. **Fiwano → Media → Download** — pulls the file into n8n. (The inbound `download_url` is API-key-protected, so Meta can't fetch it directly.)\n2. **Re-host** it at a public/signed HTTPS URL — S3, GCS, Cloudflare R2, MinIO, Azure SAS… Meta fetches outbound media **by URL**, so this step is required.\n3. **Fiwano → Message → Send Media** with that URL.\n\nAdd those three nodes after the *attachment* branch when you need it.",
-        "height": 373,
-        "width": 516,
+        "content": "## 📤 Sending media\n\n**Meta fetches outbound media by URL.** `Send Media` takes a `media_url` and Meta downloads it itself — so the file has to sit at an HTTPS address Meta can reach anonymously. Use a signed URL (S3/GCS/R2 presigned, Azure SAS) for anything non-public, with an expiry of ≥ 20 min so background retries still work. **Pro** licence required.\n\nThat is all you need for normal sending — pointing at your own images, invoices, reports.\n\n### Echoing a received file back\n\nExtra step, because the inbound `download_url` requires your `X-API-Key` and Meta will not send it. Fetch the bytes with **Media → Download**, then republish them somewhere Meta can fetch — your object storage, or any small HTTPS endpoint of your own. Files expire ~60 min after arrival.\n\n`sticker` is inbound-only (WhatsApp): re-send it as `image`.",
+        "height": 629,
+        "width": 420,
         "color": 7
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        688,
-        768
+        1952,
+        496
       ],
       "id": "bb2c0002-0002-4000-8000-000000000007",
-      "name": "Full media echo recipe"
+      "name": "Sending media"
     }
   ],
   "connections": {

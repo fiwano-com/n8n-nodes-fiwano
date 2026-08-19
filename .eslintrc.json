@@ -1,10 +1,32 @@
 {
+	// Two n8n rulesets apply to this package.
+	//   * eslint-plugin-n8n-nodes-base  — run by `npm run lint` (this config)
+	//   * @n8n/eslint-plugin-community-nodes — the Creator Portal verification
+	//     ruleset, run by `scripts/verification-lint.sh`
+	// They disagree on connection types: n8n-nodes-base expects the ['main']
+	// literal, community-nodes requires NodeConnectionTypes.Main. The verification
+	// ruleset takes precedence, so the two rules below stay disabled.
 	"parser": "@typescript-eslint/parser",
 	"parserOptions": {
 		"ecmaVersion": 2019,
 		"sourceType": "module"
 	},
+	"plugins": ["eslint-plugin-n8n-nodes-base"],
 	"rules": {
 		"no-unused-vars": "off"
-	}
+	},
+	"overrides": [
+		{
+			"files": ["nodes/**/*.ts"],
+			"extends": ["plugin:n8n-nodes-base/nodes"],
+			"rules": {
+				"n8n-nodes-base/node-class-description-inputs-wrong-regular-node": "off",
+				"n8n-nodes-base/node-class-description-outputs-wrong": "off"
+			}
+		},
+		{
+			"files": ["credentials/**/*.credentials.ts"],
+			"extends": ["plugin:n8n-nodes-base/credentials"]
+		}
+	]
 }

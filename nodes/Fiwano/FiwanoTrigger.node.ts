@@ -5,12 +5,12 @@ import {
 	IHttpRequestOptions,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	IWebhookFunctions,
 	IWebhookResponseData,
-	NodeApiError,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { FIWANO_CLIENT_HEADER_VALUE } from './GenericFunctions';
+import { FIWANO_CLIENT_HEADER_VALUE, fiwanoApiError } from './GenericFunctions';
 
 const BASE_URL = 'https://fiwano.com/api/v1';
 
@@ -37,8 +37,11 @@ export class FiwanoTrigger implements INodeType {
 		defaults: {
 			name: 'Fiwano Trigger',
 		},
+		// Shown under the node on the canvas: which channels it is wired to is the
+		// thing you need to see at a glance when several triggers are in one flow.
+		subtitle: '={{ $parameter["autoSetup"] === "channel" ? "channel: " + $parameter["channelId"] : ($parameter["autoSetup"] === "all" ? "all active channels" : "manual") }}',
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		// Credentials are optional at the node level: required only for the
 		// auto-setup modes (which call the API), optional in Manual. We keep a
 		// single entry here — declaring the same credential twice with
@@ -139,7 +142,7 @@ export class FiwanoTrigger implements INodeType {
 			},
 			{
 				displayName:
-					'Manual mode: set this node\'s Production URL (Webhook URLs, above) as the channel\'s webhook — in the Fiwano portal, or with the Fiwano node\'s "Update Webhook" operation — and use the same Webhook Secret on both sides. Prefer automatic wiring? Switch Auto-Setup to "All Active Channels".',
+					'Manual mode: set this node\'s Production URL (Webhook URLs, above) as the channel\'s webhook — in the Fiwano portal, or with the Fiwano node\'s "Update" operation — and use the same Webhook Secret on both sides. Prefer automatic wiring? Switch Auto-Setup to "All Active Channels".',
 				name: 'setupNotice',
 				type: 'notice',
 				default: '',
@@ -197,8 +200,13 @@ export class FiwanoTrigger implements INodeType {
 						(c) => !isForeign(c, url) && !(isOurs(c, url) && hasEvents(c)),
 					);
 					return wiredToUs && !needsWiring;
-				} catch {
-					// On any error, fall through to create().
+				} catch (error) {
+					// Falling through to create() is deliberate — it re-syncs and surfaces
+					// the actionable error there. Log the cause so an unreachable API or a
+					// bad credential is distinguishable from "nothing to do".
+					this.logger.warn(
+						`Fiwano trigger: could not check existing webhook registration (${(error as Error).message}). Re-running setup.`,
+					);
 					return false;
 				}
 			},
@@ -307,8 +315,13 @@ export class FiwanoTrigger implements INodeType {
 							}
 						}
 					}
-				} catch {
-					// Best-effort cleanup — don't block deactivation.
+				} catch (error) {
+					// Best-effort: never block deactivation. Log it, because a channel left
+					// pointing at this now-unused URL keeps failing delivery until it is
+					// cleared by hand.
+					this.logger.warn(
+						`Fiwano trigger: could not clear the webhook from one or more channels (${(error as Error).message}). Clear it manually via Channel -> Update or the Fiwano portal.`,
+					);
 					return false;
 				}
 				return true;
@@ -479,11 +492,10 @@ async function fiwanoHookRequest(
 			options,
 		)) as IDataObject;
 	} catch (error) {
-		const err = error as Error;
-		throw new NodeApiError(this.getNode(), {
-			message:
-				err.message ||
-				'Fiwano webhook auto-setup failed. Add Fiwano API credentials, or switch Auto-Setup to Manual.',
-		});
+		throw fiwanoApiError(
+			this.getNode(),
+			error,
+			'Fiwano webhook auto-setup failed. Add Fiwano API credentials, or switch Auto-Setup to Manual.',
+		);
 	}
 }

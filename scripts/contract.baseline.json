@@ -1,0 +1,754 @@
+{
+  "nodes": {
+    "fiwano": {
+      "name": "fiwano",
+      "version": 1,
+      "credentials": [
+        {
+          "name": "fiwanoApi",
+          "required": true
+        }
+      ],
+      "webhookPaths": [],
+      "parameters": {
+        "resource": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "channel",
+            "contact",
+            "media",
+            "message",
+            "redirect",
+            "subscription",
+            "template"
+          ],
+          "displayOptions": null
+        },
+        "operation[resource=channel]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "delete",
+            "exchangeCode",
+            "get",
+            "getAll",
+            "setupUrl",
+            "update"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ]
+            }
+          }
+        },
+        "operation[resource=message]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "send",
+            "sendMedia",
+            "sendTemplate"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ]
+            }
+          }
+        },
+        "operation[resource=template]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "create",
+            "delete",
+            "get",
+            "getAll",
+            "update"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ]
+            }
+          }
+        },
+        "operation[resource=contact]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "getProfile"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "contact"
+              ]
+            }
+          }
+        },
+        "operation[resource=redirect]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "add",
+            "delete",
+            "getAll"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "redirect"
+              ]
+            }
+          }
+        },
+        "operation[resource=media]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "download"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "media"
+              ]
+            }
+          }
+        },
+        "operation[resource=subscription]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "getAll"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "subscription"
+              ]
+            }
+          }
+        },
+        "channelId[operation=get|update|delete,resource=channel]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "get",
+                "update",
+                "delete"
+              ]
+            }
+          }
+        },
+        "channelType[operation=setupUrl,resource=channel]": {
+          "type": "options",
+          "required": true,
+          "optionValues": [
+            "facebook",
+            "instagram",
+            "whatsapp"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "setupUrl"
+              ]
+            }
+          }
+        },
+        "redirectUri[operation=setupUrl,resource=channel]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "setupUrl"
+              ]
+            }
+          }
+        },
+        "code[operation=exchangeCode,resource=channel]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "exchangeCode"
+              ]
+            }
+          }
+        },
+        "additionalFields[operation=exchangeCode,resource=channel]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "exchangeCode"
+              ]
+            }
+          }
+        },
+        "additionalFields[operation=exchangeCode,resource=channel].webhook_url": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "additionalFields[operation=exchangeCode,resource=channel].webhook_secret": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "additionalFields[operation=exchangeCode,resource=channel].webhook_events": {
+          "type": "multiOptions",
+          "required": false,
+          "optionValues": [
+            "message.delivered",
+            "message.failed",
+            "message.read",
+            "message.received",
+            "message.sent"
+          ],
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "channel"
+              ],
+              "operation": [
+                "update"
+              ]
+            }
+          }
+        },
+        "updateFields[operation=update,resource=channel].webhook_url": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].webhook_secret": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].webhook_events": {
+          "type": "multiOptions",
+          "required": false,
+          "optionValues": [
+            "message.delivered",
+            "message.failed",
+            "message.read",
+            "message.received",
+            "message.sent"
+          ],
+          "displayOptions": null
+        },
+        "channelId[resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ]
+            }
+          }
+        },
+        "recipient[resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ]
+            }
+          }
+        },
+        "text[operation=send,resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "send"
+              ]
+            }
+          }
+        },
+        "templateName[operation=sendTemplate,resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendTemplate"
+              ]
+            }
+          }
+        },
+        "language[operation=sendTemplate,resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendTemplate"
+              ]
+            }
+          }
+        },
+        "variables[operation=sendTemplate,resource=message]": {
+          "type": "json",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendTemplate"
+              ]
+            }
+          }
+        },
+        "mediaType[operation=sendMedia,resource=message]": {
+          "type": "options",
+          "required": true,
+          "optionValues": [
+            "audio",
+            "document",
+            "image",
+            "video"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendMedia"
+              ]
+            }
+          }
+        },
+        "mediaUrl[operation=sendMedia,resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendMedia"
+              ]
+            }
+          }
+        },
+        "mediaAdditionalFields[operation=sendMedia,resource=message]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendMedia"
+              ]
+            }
+          }
+        },
+        "mediaAdditionalFields[operation=sendMedia,resource=message].caption": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "mediaAdditionalFields[operation=sendMedia,resource=message].filename": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "channelId[resource=template]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ]
+            }
+          }
+        },
+        "templateId[operation=get|update|delete,resource=template]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "get",
+                "update",
+                "delete"
+              ]
+            }
+          }
+        },
+        "filters[operation=getAll,resource=template]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "getAll"
+              ]
+            }
+          }
+        },
+        "filters[operation=getAll,resource=template].status": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "",
+            "APPROVED",
+            "PENDING",
+            "REJECTED"
+          ],
+          "displayOptions": null
+        },
+        "filters[operation=getAll,resource=template].sync": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": null
+        },
+        "templateName[operation=create,resource=template]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create"
+              ]
+            }
+          }
+        },
+        "language[operation=create,resource=template]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create"
+              ]
+            }
+          }
+        },
+        "category[operation=create,resource=template]": {
+          "type": "options",
+          "required": true,
+          "optionValues": [
+            "AUTHENTICATION",
+            "MARKETING",
+            "UTILITY"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create"
+              ]
+            }
+          }
+        },
+        "components[operation=create|update,resource=template]": {
+          "type": "json",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create",
+                "update"
+              ]
+            }
+          }
+        },
+        "updateCategory[operation=update,resource=template]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "",
+            "AUTHENTICATION",
+            "MARKETING",
+            "UTILITY"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "update"
+              ]
+            }
+          }
+        },
+        "parameterFormat[operation=create,resource=template]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "named",
+            "positional"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create"
+              ]
+            }
+          }
+        },
+        "allLanguages[operation=delete,resource=template]": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "delete"
+              ]
+            }
+          }
+        },
+        "channelId[operation=getProfile,resource=contact]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "contact"
+              ],
+              "operation": [
+                "getProfile"
+              ]
+            }
+          }
+        },
+        "userId[operation=getProfile,resource=contact]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "contact"
+              ],
+              "operation": [
+                "getProfile"
+              ]
+            }
+          }
+        },
+        "profileNotice[operation=getProfile,resource=contact]": {
+          "type": "notice",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "contact"
+              ],
+              "operation": [
+                "getProfile"
+              ]
+            }
+          }
+        },
+        "uriPattern[operation=add,resource=redirect]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "redirect"
+              ],
+              "operation": [
+                "add"
+              ]
+            }
+          }
+        },
+        "redirectId[operation=delete,resource=redirect]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "redirect"
+              ],
+              "operation": [
+                "delete"
+              ]
+            }
+          }
+        },
+        "mediaId[operation=download,resource=media]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "media"
+              ],
+              "operation": [
+                "download"
+              ]
+            }
+          }
+        },
+        "binaryProperty[operation=download,resource=media]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "media"
+              ],
+              "operation": [
+                "download"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "fiwanoTrigger": {
+      "name": "fiwanoTrigger",
+      "version": 1,
+      "credentials": [
+        {
+          "name": "fiwanoApi",
+          "required": false
+        }
+      ],
+      "webhookPaths": [
+        "POST webhook"
+      ],
+      "parameters": {
+        "autoSetup": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "all",
+            "channel",
+            "manual"
+          ],
+          "displayOptions": null
+        },
+        "channelId[autoSetup=channel]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "autoSetup": [
+                "channel"
+              ]
+            }
+          }
+        },
+        "webhookSecret": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "events": {
+          "type": "multiOptions",
+          "required": false,
+          "optionValues": [
+            "message.delivered",
+            "message.failed",
+            "message.read",
+            "message.received",
+            "message.sent"
+          ],
+          "displayOptions": null
+        },
+        "setupNotice[autoSetup=manual]": {
+          "type": "notice",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "autoSetup": [
+                "manual"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "credentials": {
+    "fiwanoApi": {
+      "properties": [
+        "apiKey",
+        "webhookSecret"
+      ]
+    }
+  }
+}

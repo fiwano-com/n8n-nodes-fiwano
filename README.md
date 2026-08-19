@@ -42,7 +42,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 | Resource | Operations |
 |----------|-----------|
 | Message | Send Text, Send Media, Send Template (WhatsApp) |
-| Channel | Get Many, Get, Generate OAuth URL, Exchange OAuth Code, Update Webhook, Delete |
+| Channel | Get Many, Get, Generate OAuth URL, Exchange OAuth Code, Update (webhook settings + subscription binding), Deactivate |
 | Media | Download (saves received file as binary data) |
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
@@ -105,7 +105,7 @@ To bake it into a custom image instead, follow n8n's [community-node installatio
 
 1. [Sign up at fiwano.com](https://fiwano.com/auth/login) and create an API key in **API Keys**
 2. In n8n: **Credentials → Add → Fiwano API** → paste the key (starts with `mip_live_`)
-3. *(Optional)* Set a **Webhook Secret** on the credential to reuse one HMAC secret across all workflows — the trigger and the **Exchange OAuth Code** / **Update Webhook** operations fall back to it when their own secret field is empty.
+3. *(Optional)* Set a **Webhook Secret** on the credential to reuse one HMAC secret across all workflows — the trigger and the **Exchange OAuth Code** / **Update** operations fall back to it when their own secret field is empty.
 
 All Fiwano action nodes use this credential. The **Fiwano Trigger** node works without credentials in manual mode (it only verifies the webhook signature you configure per-channel). Add the same credential to the trigger **only** if you want it to auto-register its webhook on your channels — see [Setting Up the Trigger](#setting-up-the-trigger-webhooks).
 
@@ -126,10 +126,46 @@ The API flow is Facebook OAuth, run once per channel (WhatsApp number / Instagra
 2. Open that URL in a browser and authorize the page(s)
 3. Add another **Fiwano** node → **Channel → Exchange OAuth Code**
    - Paste the `code` from the redirect URL query parameter — it is single-use and short-lived, so exchange it promptly
+   - On failure the redirect carries `error` instead: `access_denied` (user cancelled) or `setup_failed` (setup could not complete). **Branch on `error` only** — the companion `message` is free-form English for display and may change
    - Optionally set `webhook_url` and `webhook_secret` in Additional Fields
 4. The response contains `channel_id` — save it for all subsequent nodes
 
+The same **Generate OAuth URL** operation also **reconnects** an inactive channel — there is no separate reconnect operation. Run the flow again for the same Meta account and Fiwano reactivates the existing row, so **Exchange OAuth Code** returns the channel ID you already stored.
+
 Alternatively, manage everything from the [Fiwano portal](https://fiwano.com) UI.
+
+### Turning webhook delivery off
+
+**Channel → Update** → additional field **Clear Webhook URL** removes the webhook from a
+channel. Event delivery stops until a URL is set again; the channel keeps its secret and
+its event selection, so restoring is just setting the URL back.
+
+Leaving the **Webhook URL** field blank does *not* clear it — a blank value is ignored, so
+that an unfilled field can never silently stop delivery. Clearing is always the explicit
+toggle.
+
+### Subscription slots
+
+Each subscription grants **one slot per channel type** — one WhatsApp, one Instagram, one Facebook. Use **Subscription → Get Many** to see what is free:
+
+- `available_slots.<channel_type>.total > 0` means a **new** channel of that type can be connected.
+- It does **not** gate reconnecting an inactive channel: a deactivated channel keeps its slot, and that reserved slot is what lets you bring it back.
+- `assigned_channels` shows which channel sits in each slot. The reverse lookup is `subscription.id` on the channel itself in **Channel → Get Many**.
+
+**Deactivate is a soft delete.** It stops the channel sending and receiving, but keeps its ID, history and **its subscription slot**. Deactivating alone does not free a slot.
+
+To actually replace a channel, release the slot in a second step with **Channel → Update** → **Release Subscription Slot**:
+
+```
+Channel → Deactivate            (channel_id = old channel)
+Channel → Update                (channel_id = old channel, Release Subscription Slot = true)
+Channel → Generate OAuth URL    (user connects the new Meta account)
+Channel → Exchange OAuth Code   (new channel takes the freed slot)
+```
+
+Setting **Subscription ID** to an actual ID instead **moves** the channel to that subscription — no downtime, and the channel does not have to be deactivated first. An empty Subscription ID is ignored; releasing is always the explicit toggle, so an expression that happens to resolve to empty can never retire a channel.
+
+> **Releasing a slot is effectively permanent.** Once another channel takes the freed slot, the released one can no longer be reconnected until a slot is free again. Treat it as retiring that channel, not pausing it. Moving a channel to a **Starter** subscription stops media and template sending immediately.
 
 ---
 
@@ -168,7 +204,7 @@ Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
 1. Create a workflow, add **Fiwano Trigger**, choose event types (default: `message.received`)
 2. **Save and activate** the workflow — n8n assigns a permanent webhook URL
 3. Open the **Fiwano Trigger** node and copy its **Production URL** (format: `https://your-n8n.example.com/webhook/<uuid>`)
-4. In a **Fiwano** node → **Channel → Update Webhook**, set the fields below, then execute the node once:
+4. In a **Fiwano** node → **Channel → Update**, set the fields below, then execute the node once:
    - `channel_id` — your channel
    - `webhook_url` — the Production URL from step 3
    - Leave `webhook_secret` empty to auto-generate one, or provide your own
@@ -182,8 +218,8 @@ Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
 > **When auto-setup runs.** Only on workflow **activation / deactivation** (and when n8n restarts active workflows) — never per message, so it adds no per-message overhead.
 >
 > - **Non-destructive, and silent about it.** "All Active Channels" only wires channels that aren't already pointing somewhere else; a channel wired to another URL is left alone — **and the workflow still activates without an error**. So if one channel isn't responding, check whether its webhook points elsewhere. To take a channel over deliberately, clear its webhook or use **Specific Channel**.
-> - **Deactivating removes the webhook** from the channels pointing at this trigger — it clears the webhook URL only, it does not delete the channel, messages, or any data. Fiwano keeps storing inbound messages while deactivated but won't relay them; reactivate to resume.
-> - **Clean up before removing.** Deactivate the workflow (don't just delete it, and don't remove the credential first) so the trigger can clear the webhook. If cleanup can't run, a channel keeps pointing at an inactive n8n URL and Fiwano will log delivery failures and email you until you clear it (via **Update Webhook** or the portal).
+> - **Deactivating removes the webhook** from the channels pointing at this trigger — it clears the webhook URL only, it does not delete the channel, messages, or any data. While deactivated, inbound events are **neither relayed nor stored** — reactivate to resume delivery.
+> - **Clean up before removing.** Deactivate the workflow (don't just delete it, and don't remove the credential first) so the trigger can clear the webhook. If cleanup can't run, a channel keeps pointing at an inactive n8n URL and Fiwano will log delivery failures and email you until you clear it (via **Update** or the portal).
 > - Connect a new channel after activating? Re-activate the workflow so it gets wired.
 
 ### Webhook Payload Structure
@@ -218,12 +254,61 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.media.filename }}` | Original filename (documents only; `null` otherwise) |
 | `{{ $json.data.media.duration_ms }}` | Duration in ms (audio/video only; `null` otherwise) |
 | `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
-| `{{ $json.data.caption }}` | Caption text attached to the media (WhatsApp) |
+| `{{ $json.data.media.error }}` | Present only when Fiwano could not download the file from Meta; `download_url` is then `null` |
+| `{{ $json.data.caption }}` | Text Meta sent together with the media — all channels. Plain text messages use `data.text` instead |
+| `{{ $json.data.unsupported_type }}` | On `type: "unsupported"` — what Meta actually sent (see below) |
 | `{{ $json.data.upgrade_required }}` | `"pro"` if channel lacks a Pro license for this message |
+| `{{ $json.data.status }}` | On `message.delivered` / `read` / `failed` — `"delivered"`, `"read"`, `"failed"` |
+| `{{ $json.data.errors }}` | On `message.failed` — Meta's raw error array, e.g. `[{"code":131047,"title":"..."}]`. `data.error` holds the readable summary |
+
+### Messages with several attachments
+
+When a user sends an album (several files in one Instagram or Facebook message), Fiwano delivers **one `message.received` event — and one trigger execution — per attachment**. There is never an array of events in a single execution, so a workflow that handles one file already handles albums.
+
+What to rely on:
+
+- All files are downloaded **before the first event is sent**, then events arrive in Meta's attachment order.
+- `data.caption` is on the **first** event only.
+- The first event keeps Meta's own message ID; later parts get `.2`, `.3`, … appended. **Treat `data.message_id` as an opaque idempotency key** — do not parse the suffix and do not pass the ID back to Meta.
+- Retries are independent per event, so a failing endpoint can see a later part before a retried earlier one. Do not assume strict arrival order.
+- One failed download does not suppress the rest: that event carries `media.download_url: null` and `media.error`.
+
+WhatsApp is unaffected — Meta already delivers each WhatsApp media message separately.
+
+### `type: "unsupported"`
+
+`data.type` is a closed set — `text`, `image`, `audio`, `video`, `document`, `sticker` (WhatsApp only), `unsupported` — and never a raw provider value, so it is safe to switch on. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
+
+| Case | Looks like | What to do |
+|---|---|---|
+| Media on a **Starter** license | `unsupported_type` is the media type (`image`, …) **and** `upgrade_required: "pro"` | Upgrade to Pro to receive the file |
+| Content that is not a file | `unsupported_type` is Meta's own name — `location`, `contacts` (WhatsApp), `share`, `ig_reel`, `story_mention`, `fallback`, `template` (Instagram/Facebook) — and **no** `upgrade_required` | No tier delivers these as files; handle or ignore |
+
+There is no `data.media` block on `unsupported`. An unfamiliar `unsupported_type` is still just unsupported content — treat the list as open. Message reactions are dropped entirely and never arrive as events.
 
 ---
 
 ## Sending Messages
+
+### Reading the send result
+
+**A green node does not mean the message was sent.** All three send operations answer HTTP `200` even when the send fails, and report the outcome in the item's `success` and `status` fields. The node only turns red on transport and request errors (bad API key, no subscription, rate limit, malformed request) — a Meta-side send failure comes back as a normal, successful item.
+
+| `status` | `success` | What it means |
+|---|---|---|
+| `sent` | `true` | Meta accepted it. Track the rest via `message.delivered` / `read` / `failed` webhooks. |
+| `queued` | `true` | Transient Meta failure. Fiwano retries in the background (7 attempts over ~20 min) and emails the channel owner if they run out. **Send Text and Send Media only** — templates are never queued. |
+| `failed` | `false` | Not retried. `error` explains it and `error_code` carries Meta's code when the failure came from Meta. |
+
+So branch on the result rather than trusting the node's success state:
+
+```
+IF  {{ $json.success }}  is false   → your failure path
+```
+
+`status: "failed"` also covers the rare case where Meta accepted the send but its response never reached Fiwano. Those carry no `error_code` and are **deliberately not retried**, because an automatic retry could deliver the message twice — check the conversation before resending.
+
+`message_id` is a Fiwano UUID, not a Meta ID. Every later delivery-status webhook references that same UUID.
 
 ### Text message
 
@@ -233,6 +318,10 @@ Channel ID: <channel_id>
 Recipient: {{ $('Fiwano Trigger').item.json.data.from }}
 Text: Hello!
 ```
+
+Text must contain at least one non-whitespace character — empty or whitespace-only values are rejected with HTTP `422` before Meta is called. Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000; oversize text is rejected with `400`, and Fiwano does not auto-split.
+
+Sends are limited to **10 accepted sends per second per channel**, shared across all API keys. Exceeding it returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
 
 ### WhatsApp template
 
@@ -267,7 +356,9 @@ Additional Fields → Caption: Check this out!
 
 Meta fetches the file directly from `Media URL` — Fiwano does not download or store it.
 
-**For non-public content, use a signed URL** — S3/GCS/R2 presigned, Azure SAS, or HMAC-signed URL on your own server. Set expiry to ≥ 5 minutes. Public URLs are accessible to anyone who learns them.
+**For non-public content, use a signed URL** — S3/GCS/R2 presigned, Azure SAS, or HMAC-signed URL on your own server. Set expiry to **≥ 20 minutes** so background retries can still fetch the file. Public URLs are accessible to anyone who learns them.
+
+Send Media is **synchronous and can be slow**: Meta downloads your file inside the request, so the wait scales with file size and your hosting. Fiwano gives up on Meta after 30 seconds — set your own timeout to at least 35 seconds if you call this from outside n8n.
 
 URL validation: HTTPS only, max 2048 chars, no credentials in URL (`user:pass@`), no private/loopback IPs. Violations return HTTP 422.
 

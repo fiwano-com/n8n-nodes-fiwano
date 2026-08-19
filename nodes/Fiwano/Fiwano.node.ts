@@ -4,7 +4,10 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	NodeOperationError,
+	NodeApiError,
+	JsonObject,
 } from 'n8n-workflow';
 
 import { fiwanoApiRequest, fiwanoApiRequestBinary } from './GenericFunctions';
@@ -27,8 +30,8 @@ export class Fiwano implements INodeType {
 		description: 'Interact with Fiwano — unified API for WhatsApp, Instagram & Facebook Messenger',
 		defaults: { name: 'Fiwano' },
 		usableAsTool: true,
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'fiwanoApi', required: true }],
 		properties: [
 			{
@@ -122,7 +125,13 @@ export class Fiwano implements INodeType {
 					});
 					continue;
 				}
-				throw error;
+				// Our own helpers already raise NodeApiError / NodeOperationError, which
+				// carry the HTTP status and the actionable reason — re-throw those as-is.
+				// Anything else is an unexpected fault in this node; wrap it so n8n shows
+				// a node-attributed error instead of a bare stack trace.
+				throw error instanceof NodeApiError || error instanceof NodeOperationError
+					? error
+					: new NodeApiError(this.getNode(), error as JsonObject);
 			}
 		}
 
@@ -171,13 +180,33 @@ async function executeChannel(
 		const channelId = this.getNodeParameter('channelId', i) as string;
 		const fields = this.getNodeParameter('updateFields', i) as IDataObject;
 		const body: IDataObject = {};
-		if (fields.webhook_url) body.webhook_url = fields.webhook_url;
+		// Clearing needs an explicit opt-in rather than an empty Webhook URL. The
+		// URL field predates this option, so treating "added but left blank" as
+		// "remove the webhook" would silently stop event delivery for anyone who
+		// had configured it that way.
+		const clearing = fields.clear_webhook_url === true;
+		if (clearing) body.webhook_url = '';
+		else if (fields.webhook_url) body.webhook_url = fields.webhook_url;
 		// Secret: the explicit field wins; otherwise fall back to the credential's
-		// default Webhook Secret when a webhook URL is being configured.
+		// default Webhook Secret when a webhook URL is being configured. Never
+		// while clearing — the channel keeps the secret it already has.
 		const upSecret = (fields.webhook_secret as string)
-			|| (fields.webhook_url ? await credentialWebhookSecret.call(this) : '');
+			|| (!clearing && fields.webhook_url ? await credentialWebhookSecret.call(this) : '');
 		if (upSecret) body.webhook_secret = upSecret;
 		if (fields.webhook_events) body.webhook_events = fields.webhook_events;
+		// Releasing a subscription slot is effectively permanent, so it needs its own
+		// explicit opt-in. Driving it from an empty Subscription ID would mean an
+		// expression that happens to resolve to '' silently retires the channel.
+		if (fields.release_subscription_slot === true) {
+			body.subscription_id = '';
+		} else {
+			const target = ((fields.subscription_id as string) ?? '').trim();
+			if (target) body.subscription_id = target;
+		}
+		// An empty collection still sends PATCH {} (a harmless server-side no-op),
+		// exactly as before. Rejecting it locally would be a nicer signal, but it
+		// would newly fail workflows whose fields come from expressions that can
+		// legitimately resolve to empty — not worth breaking on an upgrade.
 		return fiwanoApiRequest.call(this, 'PATCH', `/channels/${channelId}`, body);
 	}
 	if (operation === 'delete') {
@@ -398,7 +427,7 @@ async function executeRedirect(
 /**
  * Read the optional default Webhook Secret stored on the Fiwano API credential.
  * Returns '' when no credential is attached or the field is empty. Used so the
- * Exchange OAuth Code / Update Webhook operations can fall back to a single
+ * Exchange OAuth Code / Update operations can fall back to a single
  * account-wide secret instead of requiring it on every node.
  */
 async function credentialWebhookSecret(this: IExecuteFunctions): Promise<string> {

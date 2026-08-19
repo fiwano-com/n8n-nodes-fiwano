@@ -16,7 +16,7 @@ export const messageOperations: INodeProperties = {
 		{
 			name: 'Send Template',
 			value: 'sendTemplate',
-			action: 'Send a WhatsApp template message',
+			action: 'Send a template message',
 			description: 'Send an approved WhatsApp template (Pro required; required outside the 24h window)',
 		},
 		{
@@ -51,6 +51,7 @@ export const messageFields: INodeProperties[] = [
 		default: '',
 		required: true,
 		placeholder: 'e.g. 1234567890',
+		// eslint-disable-next-line n8n-nodes-base/node-param-description-miscased-json -- `$json` is an n8n expression, not the word JSON
 		description: 'Phone number without + (WhatsApp), IGSID (Instagram), or PSID (Facebook). Use {{ $json.data.from }} from a Fiwano Trigger to reply.',
 		displayOptions: {
 			show: { resource: ['message'] },

@@ -3,3 +3,4 @@ dist/
 *.js.map
 NOTES.md
 .DS_Store
+node_modules/.verification-lint/

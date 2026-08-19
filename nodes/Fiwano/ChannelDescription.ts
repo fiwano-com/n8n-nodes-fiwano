@@ -8,22 +8,22 @@ export const channelOperations: INodeProperties = {
 	displayOptions: { show: { resource: ['channel'] } },
 	options: [
 		{
-			name: 'Delete',
+			name: 'Deactivate',
 			value: 'delete',
-			action: 'Delete a channel',
-			description: 'Deactivate and remove a channel',
+			action: 'Deactivate a channel',
+			description: 'Stop a channel sending and receiving. This is a soft delete: the channel ID, its history and its subscription slot are kept so the same Meta account can be reconnected later.',
 		},
 		{
 			name: 'Exchange OAuth Code',
 			value: 'exchangeCode',
-			action: 'Exchange an OAuth code for channel data',
+			action: 'Exchange a setup code for channel data',
 			description: 'Exchange a one-time code from the OAuth redirect for channel data',
 		},
 		{
 			name: 'Generate OAuth URL',
 			value: 'setupUrl',
-			action: 'Generate an OAuth setup URL',
-			description: 'Generate a setup URL to connect a new channel (WhatsApp Embedded Signup or Meta OAuth; valid up to 60 min)',
+			action: 'Generate a channel setup link',
+			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min.',
 		},
 		{
 			name: 'Get',
@@ -35,13 +35,13 @@ export const channelOperations: INodeProperties = {
 			name: 'Get Many',
 			value: 'getAll',
 			action: 'Get many channels',
-			description: 'Retrieve all connected channels',
+			description: 'Retrieve many connected channels',
 		},
 		{
-			name: 'Update Webhook',
+			name: 'Update',
 			value: 'update',
-			action: 'Update channel webhook settings',
-			description: 'Update the webhook URL and/or secret for a channel',
+			action: 'Update a channel',
+			description: 'Update the webhook URL, secret and events for a channel — and move it between subscriptions or release its subscription slot',
 		},
 	],
 	default: 'getAll',
@@ -119,7 +119,7 @@ export const channelFields: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				placeholder: 'https://your-n8n.example.com/webhook/…',
-				description: 'HTTPS URL to receive webhook events. Can also be set later via Update Webhook.',
+				description: 'HTTPS URL to receive webhook events. Can also be set later via Channel → Update.',
 			},
 			{
 				displayName: 'Webhook Secret',
@@ -136,17 +136,17 @@ export const channelFields: INodeProperties[] = [
 				default: [],
 				description: 'Event types to deliver to the webhook URL. By default no events are enabled — you must select at least one to receive webhooks. Available events depend on the channel type.',
 				options: [
+					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
+					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
+					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
 					{ name: 'Message Received', value: 'message.received', description: 'Incoming message from a user (all channels)' },
 					{ name: 'Message Sent', value: 'message.sent', description: 'Message accepted by Meta (WhatsApp only)' },
-					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
-					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
-					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
 				],
 			},
 		],
 	},
 
-	// ── Update Webhook ───────────────────────────────────────────────
+	// ── Update ───────────────────────────────────────────────
 	{
 		displayName: 'Update Fields',
 		name: 'updateFields',
@@ -158,12 +158,44 @@ export const channelFields: INodeProperties[] = [
 		},
 		options: [
 			{
-				displayName: 'Webhook URL',
-				name: 'webhook_url',
+				displayName: 'Clear Webhook URL',
+				name: 'clear_webhook_url',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to remove the webhook URL from this channel. Event delivery stops until a URL is set again; the secret and the event selection are kept. Takes precedence over Webhook URL when both are present.',
+			},
+			{
+				displayName: 'Release Subscription Slot',
+				name: 'release_subscription_slot',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to unbind this channel from its subscription, freeing the slot for a different channel of the same type. The channel must already be deactivated. This is effectively permanent: once another channel takes the freed slot, this one cannot be reconnected until a slot is free again. Takes precedence over Subscription ID.',
+			},
+			{
+				displayName: 'Subscription ID',
+				name: 'subscription_id',
 				type: 'string',
 				default: '',
-				placeholder: 'https://your-n8n.example.com/webhook/…',
-				description: 'New webhook URL for this channel',
+				placeholder: 'e.g. a1b2c3d4e5f67890',
+				description:
+					'Move the channel to another subscription (use an ID from Subscription → Get Many). ' +
+					'An empty value is ignored — to unbind, use Release Subscription Slot instead. ' +
+					'Moving is reversible and causes no downtime, but moving to a Starter subscription ' +
+					'stops media and template sending immediately.',
+			},
+			{
+				displayName: 'Webhook Events',
+				name: 'webhook_events',
+				type: 'multiOptions',
+				default: [],
+				description: 'Event types to deliver. Empty array disables all events. Available events depend on channel type.',
+				options: [
+					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
+					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
+					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
+					{ name: 'Message Received', value: 'message.received', description: 'Incoming message from a user (all channels)' },
+					{ name: 'Message Sent', value: 'message.sent', description: 'Message accepted by Meta (WhatsApp only)' },
+				],
 			},
 			{
 				displayName: 'Webhook Secret',
@@ -174,19 +206,13 @@ export const channelFields: INodeProperties[] = [
 				description: 'New HMAC-SHA256 secret. Auto-generated if URL is set and secret is omitted.',
 			},
 			{
-				displayName: 'Webhook Events',
-				name: 'webhook_events',
-				type: 'multiOptions',
-				default: [],
-				description: 'Event types to deliver. Empty array disables all events. Available events depend on channel type.',
-				options: [
-					{ name: 'Message Received', value: 'message.received', description: 'Incoming message from a user (all channels)' },
-					{ name: 'Message Sent', value: 'message.sent', description: 'Message accepted by Meta (WhatsApp only)' },
-					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
-					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
-					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
-				],
+				displayName: 'Webhook URL',
+				name: 'webhook_url',
+				type: 'string',
+				default: '',
+				placeholder: 'https://your-n8n.example.com/webhook/…',
+				description: 'New webhook URL for this channel. Must be HTTPS and externally reachable; explicit ports are supported, loopback addresses are rejected.',
 			},
-		],
+],
 	},
 ];
