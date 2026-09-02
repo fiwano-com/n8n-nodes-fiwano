@@ -1,17 +1,20 @@
 # Publishes n8n-nodes-fiwano to npm on every version tag push.
 #
-# Provenance: npm publish --provenance creates a cryptographic attestation
-# linking this package to this exact workflow, repo, and commit.
-# Required by n8n Creator Portal since May 2026.
+# Auth: npm Trusted Publishing (OIDC) — no NPM_TOKEN. GitHub mints a short-lived
+# OIDC token (id-token: write), npm trusts it because the package is configured
+# with this repo + workflow as a Trusted Publisher (npmjs.com -> package
+# Settings -> Trusted Publisher). This replaces the deprecated 2FA-bypass
+# Granular Access Token (npm is removing direct publishing for those by ~Jan 2027
+# — https://github.blog/changelog/2026-07-08-npm-install-time-security-and-gat-bypass2fa-deprecation/).
 #
-# ─── ONE-TIME SETUP ──────────────────────────────────────────────────────
+# Provenance (--provenance) is generated automatically from the same OIDC token,
+# so the npm page keeps its "built and signed on GitHub Actions" attestation.
 #
-# 1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token
-#    - Scope: Read and write (publish)
-#    - Package: n8n-nodes-fiwano (or all packages)
-# 2. In GitHub repo: Settings → Secrets → Actions → New secret
-#    - Name: NPM_TOKEN
-#    - Value: paste the token
+# ─── ONE-TIME SETUP (already done) ───────────────────────────────────────
+#
+# On npmjs.com: n8n-nodes-fiwano -> Settings -> Trusted Publisher -> GitHub
+#   Actions -> owner: fiwano-com, repo: n8n-nodes-fiwano, workflow: publish.yml.
+# No repository secret is required.
 #
 # ─── RELEASE PROCESS ─────────────────────────────────────────────────────
 #
@@ -34,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      # Required for npm provenance attestation (OIDC token)
+      # OIDC token for npm Trusted Publishing + provenance attestation
       id-token: write
       contents: read
 
@@ -48,6 +51,10 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted Publishing (OIDC) needs npm >= 11.5.0; Node 22 ships npm 10.x.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -57,7 +64,6 @@ jobs:
       - name: Build
         run: npm run build
 
+      # No NODE_AUTH_TOKEN: auth comes from the OIDC token via Trusted Publishing.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
