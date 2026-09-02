@@ -20,7 +20,10 @@
     },
     {
       "parameters": {
-        "autoSetup": "all"
+        "autoSetup": "all",
+        "events": [
+          "message.received"
+        ]
       },
       "type": "n8n-nodes-fiwano.fiwanoTrigger",
       "typeVersion": 1,

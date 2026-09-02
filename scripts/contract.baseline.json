@@ -213,6 +213,11 @@
             }
           }
         },
+        "additionalFields[operation=exchangeCode,resource=channel].echo_statuses": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": null
+        },
         "additionalFields[operation=exchangeCode,resource=channel].webhook_url": {
           "type": "string",
           "required": false,
@@ -228,6 +233,7 @@
           "required": false,
           "optionValues": [
             "message.delivered",
+            "message.echo",
             "message.failed",
             "message.read",
             "message.received",
@@ -249,13 +255,23 @@
             }
           }
         },
-        "updateFields[operation=update,resource=channel].webhook_url": {
+        "updateFields[operation=update,resource=channel].clear_webhook_url": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].release_subscription_slot": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].subscription_id": {
           "type": "string",
           "required": false,
           "displayOptions": null
         },
-        "updateFields[operation=update,resource=channel].webhook_secret": {
-          "type": "string",
+        "updateFields[operation=update,resource=channel].echo_statuses": {
+          "type": "boolean",
           "required": false,
           "displayOptions": null
         },
@@ -264,11 +280,22 @@
           "required": false,
           "optionValues": [
             "message.delivered",
+            "message.echo",
             "message.failed",
             "message.read",
             "message.received",
             "message.sent"
           ],
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].webhook_secret": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "updateFields[operation=update,resource=channel].webhook_url": {
+          "type": "string",
+          "required": false,
           "displayOptions": null
         },
         "channelId[resource=message]": {
@@ -722,6 +749,7 @@
           "required": false,
           "optionValues": [
             "message.delivered",
+            "message.echo",
             "message.failed",
             "message.read",
             "message.received",

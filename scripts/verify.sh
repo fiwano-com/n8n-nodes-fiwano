@@ -125,6 +125,31 @@ gate "n8n verification ruleset (working tree)" ./scripts/verification-lint.sh
 #     package, so it validates the last release rather than your working tree —
 #     keep it as a final confirmation, not as your feedback loop.
 if [[ $FULL -eq 1 ]]; then
+  # 9b. The verification ruleset our local gate (#9) mirrors is version-pinned in
+  #     verification-lint.sh. The Creator Portal applies whatever ruleset the
+  #     current @n8n/scan-community-package bundles, and that moves over time. If
+  #     our pin has drifted behind it, gate #9 silently checks the WRONG (older)
+  #     rules and a new rule can slip through to the Portal — exactly how v1.2.0
+  #     was rejected after publishing clean locally. Fail here so the pin gets
+  #     refreshed before release. Network-only, so it lives in --full.
+  gate "Verification ruleset is current" bash -c '
+    pinned=$(grep -oE "PLUGIN_VERSION=\"[0-9.]+\"" scripts/verification-lint.sh | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+    portal=$(npm view @n8n/scan-community-package@latest dependencies --json 2>/dev/null \
+      | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{try{process.stdout.write(JSON.parse(s)[\"@n8n/eslint-plugin-community-nodes\"]||\"\")}catch(e){}})")
+    if [[ -z "$portal" ]]; then
+      printf "   could not read the Portal ruleset version from npm (offline?); skipping the drift check — the scanner gate below is the backstop\n"
+      exit 0
+    fi
+    printf "   pinned=%s  portal(@n8n/scan-community-package→community-nodes)=%s\n" "$pinned" "$portal"
+    if [[ "$pinned" != "$portal" ]]; then
+      printf "   STALE: the Creator Portal now uses %s but the local gate pins %s.\n" "$portal" "$pinned"
+      printf "   Fix: set PLUGIN_VERSION=\"%s\" in scripts/verification-lint.sh, run\n" "$portal"
+      printf "   ./scripts/verification-lint.sh --refresh, resolve any new findings, then re-run.\n"
+      exit 1
+    fi
+    exit 0
+  '
+
   # The scanner exits 0 even when it reports errors, so its exit code is not a
   # gate. Parse the summary line instead.
   gate "Official n8n scanner (published package)" bash -c '

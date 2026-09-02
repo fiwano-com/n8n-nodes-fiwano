@@ -14,17 +14,6 @@ import { FIWANO_CLIENT_HEADER_VALUE, fiwanoApiError } from './GenericFunctions';
 
 const BASE_URL = 'https://fiwano.com/api/v1';
 
-// All webhook event types Fiwano can deliver. Used when the user leaves the
-// event filter empty in auto-setup mode — the channel is subscribed to all of
-// them and Fiwano keeps only the ones valid for the channel's type.
-const ALL_EVENTS = [
-	'message.received',
-	'message.sent',
-	'message.delivered',
-	'message.read',
-	'message.failed',
-];
-
 export class FiwanoTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Fiwano Trigger',
@@ -109,11 +98,28 @@ export class FiwanoTrigger implements INodeType {
 				displayName: 'Event Types',
 				name: 'events',
 				type: 'multiOptions',
+				// Deliberate order — inbound → delivery lifecycle (delivered/read/failed)
+				// → sent → echo — matching how users reason about the message flow, not
+				// alphabetical. The Creator Portal verification ruleset
+				// (@n8n/eslint-plugin-community-nodes) does not require sorting; only this
+				// repo's stricter self-lint (eslint-plugin-n8n-nodes-base) does, so its
+				// sort rule is suppressed for this array.
+				// eslint-disable-next-line n8n-nodes-base/node-param-multi-options-type-unsorted-items
 				options: [
+					{
+						name: 'Message Received',
+						value: 'message.received',
+						description: 'Incoming message from a user',
+					},
 					{
 						name: 'Message Delivered',
 						value: 'message.delivered',
-						description: 'Message delivered to the recipient (WhatsApp, Instagram, Facebook)',
+						description: 'Message delivered to the recipient',
+					},
+					{
+						name: 'Message Read',
+						value: 'message.read',
+						description: 'Recipient read the message',
 					},
 					{
 						name: 'Message Failed',
@@ -121,24 +127,21 @@ export class FiwanoTrigger implements INodeType {
 						description: 'Message delivery failed (WhatsApp only)',
 					},
 					{
-						name: 'Message Read',
-						value: 'message.read',
-						description: 'Recipient read the message (WhatsApp, Instagram, Facebook)',
-					},
-					{
-						name: 'Message Received',
-						value: 'message.received',
-						description: 'Incoming message from a user (WhatsApp, Instagram, Facebook)',
-					},
-					{
 						name: 'Message Sent',
 						value: 'message.sent',
 						description: 'Your message was accepted by Meta (WhatsApp only)',
 					},
+					{
+						name: 'Message Echo',
+						value: 'message.echo',
+						description:
+							'Copy of a message your business sent outside Fiwano — WhatsApp Business App, Instagram inbox, Facebook Page Inbox, Meta Business Suite, or another integration (WhatsApp Coexistence numbers only)',
+					},
 				],
 				default: ['message.received'],
 				description:
-					'Which event types this trigger processes. In auto-setup mode the same selection is registered as the channel\'s webhook_events; events invalid for a channel type are ignored by Fiwano. Leave empty to process (and, in auto-setup, subscribe to) all event types.',
+					'Select only the events you actually need, to reduce webhook load. In auto-setup mode this selection is written to each channel\'s webhook_events (overwriting what was there); events invalid for a channel type are ignored by Fiwano. Leave empty to keep each channel\'s existing events unchanged (manage them in the portal or via Channel → Update) — and, at runtime, to process every event that arrives.',
+				hint: 'Auto-setup writes these onto the channel. Leave empty to keep the channel\'s current events unchanged.',
 			},
 			{
 				displayName:
@@ -179,11 +182,19 @@ export class FiwanoTrigger implements INodeType {
 					// healthy and skip create(), where the actionable error is surfaced.
 					assertAutoSetupWebhookUrl(this, url);
 
+					// When events are selected, create() writes them, so "already wired"
+					// also requires the channel to carry at least one event. When the
+					// selection is empty, create() leaves the channel's events alone, so
+					// "wired" is purely the URL pointing here — otherwise an eventless
+					// channel would make checkExists re-run create() on every restart.
+					const manageEvents = (this.getNodeParameter('events', []) as string[]).length > 0;
+					const wiredOk = (c: IDataObject) => isOurs(c, url) && (!manageEvents || hasEvents(c));
+
 					if (mode === 'channel') {
 						const channelId = (this.getNodeParameter('channelId', '') as string).trim();
 						if (!channelId) return false;
 						const ch = await fiwanoHookRequest.call(this, 'GET', `/channels/${channelId}`);
-						return isOurs(ch, url) && hasEvents(ch);
+						return wiredOk(ch);
 					}
 
 					// mode === 'all'
@@ -192,13 +203,12 @@ export class FiwanoTrigger implements INodeType {
 					if (active.length === 0) return false;
 					// "Nothing to do" requires BOTH: we're actually wired to at least one
 					// channel, AND no channel is still waiting to be wired (empty, or ours
-					// but eventless). If every active channel points elsewhere we are not
-					// registered anywhere → return false so create() runs and surfaces a
-					// clear "nothing to wire" error instead of going live silently dead.
-					const wiredToUs = active.some((c) => isOurs(c, url) && hasEvents(c));
-					const needsWiring = active.some(
-						(c) => !isForeign(c, url) && !(isOurs(c, url) && hasEvents(c)),
-					);
+					// but eventless when events are managed). If every active channel points
+					// elsewhere we are not registered anywhere → return false so create()
+					// runs and surfaces a clear "nothing to wire" error instead of going
+					// live silently dead.
+					const wiredToUs = active.some(wiredOk);
+					const needsWiring = active.some((c) => !isForeign(c, url) && !wiredOk(c));
 					return wiredToUs && !needsWiring;
 				} catch (error) {
 					// Falling through to create() is deliberate — it re-syncs and surfaces
@@ -228,10 +238,16 @@ export class FiwanoTrigger implements INodeType {
 
 				const events = this.getNodeParameter('events', []) as string[];
 				const secret = await resolveWebhookSecret(this);
-				const body: IDataObject = {
-					webhook_url: url,
-					webhook_events: events.length > 0 ? events : ALL_EVENTS,
-				};
+				// Auto-setup owns the webhook URL wiring. The event list is written only
+				// when the user has selected some — an empty selection deliberately leaves
+				// each channel's existing webhook_events untouched (the user configures
+				// them in the portal or via Channel → Update). create() never removes
+				// events a channel already has; it only ever adds the URL/secret and, when
+				// chosen, the selected events.
+				const body: IDataObject = { webhook_url: url };
+				if (events.length > 0) {
+					body.webhook_events = events;
+				}
 				if (secret) {
 					body.webhook_secret = secret;
 				}

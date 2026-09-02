@@ -56,12 +56,13 @@ The trigger starts your workflow for any of these events:
 | Event | Channels |
 |-------|---------|
 | `message.received` | WhatsApp, Instagram, Facebook |
+| `message.echo` | WhatsApp (Coexistence only), Instagram, Facebook |
 | `message.delivered` | WhatsApp, Instagram, Facebook |
 | `message.read` | WhatsApp, Instagram, Facebook |
 | `message.sent` | WhatsApp |
 | `message.failed` | WhatsApp |
 
-Filter by event type in node settings. HMAC-SHA256 signature verification is built in.
+Filter by event type in node settings. HMAC-SHA256 signature verification is built in. `message.echo` is off by default — select **Message Echo** explicitly (see [Message echoes](#message-echoes-messages-sent-outside-fiwano)).
 
 ---
 
@@ -181,7 +182,7 @@ Let the trigger register its own webhook on your channel(s).
 2. Set **Webhook Auto-Setup**:
    - **All Active Channels** — wire every connected channel (WhatsApp + Instagram + Facebook) that isn't already pointing elsewhere to this one trigger. One flow, three platforms.
    - **Specific Channel** — register on a single **Channel ID** (takes it over even if it already has a webhook).
-3. Choose **Event Types** (these become each channel's `webhook_events`)
+3. Choose **Event Types** — these are **written to** each channel's `webhook_events` (overwriting what was there). Leave it empty to have auto-setup wire only the URL and **leave the channel's existing events unchanged** (manage them in the portal or via **Channel → Update**). New nodes start with `message.received` selected.
 4. *(Recommended)* Set a **Webhook Secret** to verify incoming signatures — preferably on the **credential** (reused everywhere; see [Credentials](#credentials)). The trigger's own Webhook Secret field overrides it.
 5. **Save and activate** the workflow — the trigger PATCHes the channel(s) with its webhook URL, events, and secret. Deactivating clears the webhook URL again (in "All" mode, only on channels still pointing at this trigger).
 
@@ -213,7 +214,7 @@ Set **Webhook Auto-Setup** to **Manual** (no credential needed on the trigger).
 
 > **n8n must be publicly accessible.** Fiwano delivers webhooks over the internet. Local `localhost` won't work — use a reverse proxy, ngrok, or n8n Cloud.
 
-> **Event filter vs. channel subscription.** The trigger's **Event Types** filter is applied on the n8n side. In automatic setup it is also used as the channel's `webhook_events`; in manual setup make sure the events you enable on the channel match what the trigger expects.
+> **Event filter vs. channel subscription.** The trigger's **Event Types** filter is applied on the n8n side (empty = process every event that arrives). In **automatic** setup the same selection is also **written to** the channel's `webhook_events`, overwriting what was there — **except when it's empty**, in which case auto-setup leaves the channel's events untouched and you configure them yourself (portal or **Channel → Update**). In **manual** setup, make sure the events you enable on the channel match what the trigger expects.
 
 > **When auto-setup runs.** Only on workflow **activation / deactivation** (and when n8n restarts active workflows) — never per message, so it adds no per-message overhead.
 >
@@ -285,6 +286,34 @@ WhatsApp is unaffected — Meta already delivers each WhatsApp media message sep
 | Content that is not a file | `unsupported_type` is Meta's own name — `location`, `contacts` (WhatsApp), `share`, `ig_reel`, `story_mention`, `fallback`, `template` (Instagram/Facebook) — and **no** `upgrade_required` | No tier delivers these as files; handle or ignore |
 
 There is no `data.media` block on `unsupported`. An unfamiliar `unsupported_type` is still just unsupported content — treat the list as open. Message reactions are dropped entirely and never arrive as events.
+
+### Message echoes (messages sent outside Fiwano)
+
+When someone on your side answers a customer **without going through Fiwano** — the WhatsApp Business App, the Instagram inbox, the Facebook Page Inbox, Meta Business Suite, or another integration — Meta echoes that message back, and Fiwano can deliver you a copy so your workflow sees the whole conversation, not just its own half.
+
+Enable it by selecting **Message Echo** in the trigger's **Event Types** (in auto-setup mode this registers `message.echo` on the channel). It is **off by default** on every plan, and leaving Event Types empty does **not** enable it — echo must be chosen explicitly. Available on Starter and Pro; on WhatsApp it fires only for **Coexistence** numbers (a Cloud-API-only channel has no external messages to echo).
+
+A `message.echo` event uses the same envelope as every other event; the `data` block looks like:
+
+| Expression | Value |
+|---|---|
+| `{{ $json.data.message_id }}` | A Fiwano UUID, **stable** across redeliveries — deduplicate on it |
+| `{{ $json.data.recipient }}` | Who the message was sent to, in the same format the send operations accept — reply to it directly |
+| `{{ $json.data.status }}` | Always `"sent"` (the message exists in the conversation; there is no separate `message.sent` for echoes) |
+| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `sticker`, or `unsupported` — same closed set as `message.received` |
+| `{{ $json.data.text }}` / `{{ $json.data.caption }}` | The text, or the caption on a media echo |
+
+> **Never mirror an echo back into the same conversation without deduplicating by `message_id`.** Your own reply generates no echo (Fiwano's sends are filtered out), but a bot on the other side — or a second integration echoing too — can create a loop.
+
+**Media in echoes is not delivered.** An echoed media message keeps its real `data.type` and caption, but the file is skipped: `data.media` arrives with `download_url: null` and `unavailable: "echo_media_not_supported"`. The rule you already apply to inbound media — check `data.media.download_url` before fetching — covers this with no extra code. Multi-attachment Instagram/Messenger messages split into one echo per attachment, each with its own `message_id`.
+
+**Not delivered as echoes:** reactions, message edits, and message deletions (unsend) — they are changes to an existing message, not new messages, and are silently skipped.
+
+#### Tracking delivery/read status for echoes
+
+By default an echo is a one-off copy with no `delivered`/`read` follow-ups. To get the same status lifecycle echoes as messages you send through Fiwano, turn on **Track Echo Statuses** on the channel via **Channel → Update** (or **Exchange OAuth Code**) — it maps to the API's `echo_statuses`. Subsequent `message.delivered` / `message.read` / `message.failed` webhooks then reference the same echo `message_id` and are filtered by your Event Types exactly like ordinary statuses (this creates tracking records on Fiwano's side).
+
+Statuses and echoes are delivered independently and at-least-once — a status can occasionally arrive **before** the echo it belongs to. Correlate by `message_id` and upsert rather than relying on arrival order. WhatsApp/Facebook deliver both `delivered` and `read`; Instagram delivers only `read` (Meta does not provide `delivered`).
 
 ---
 

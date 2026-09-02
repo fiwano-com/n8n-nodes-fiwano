@@ -174,6 +174,10 @@ async function executeChannel(
 		if (extra.webhook_events && (extra.webhook_events as string[]).length > 0) {
 			body.webhook_events = extra.webhook_events;
 		}
+		// Echo status tracking: only sent when the user added the field to the
+		// collection (undefined = not added). An added-but-false value is meaningful
+		// (explicitly relay-only), so key on `!== undefined`, not on truthiness.
+		if (extra.echo_statuses !== undefined) body.echo_statuses = extra.echo_statuses;
 		return fiwanoApiRequest.call(this, 'POST', '/channels/exchange-code', body);
 	}
 	if (operation === 'update') {
@@ -194,6 +198,10 @@ async function executeChannel(
 			|| (!clearing && fields.webhook_url ? await credentialWebhookSecret.call(this) : '');
 		if (upSecret) body.webhook_secret = upSecret;
 		if (fields.webhook_events) body.webhook_events = fields.webhook_events;
+		// Echo status tracking: only sent when the user added the field to the
+		// collection (undefined = not added). An added-but-false value is meaningful
+		// (explicitly relay-only), so key on `!== undefined`, not on truthiness.
+		if (fields.echo_statuses !== undefined) body.echo_statuses = fields.echo_statuses;
 		// Releasing a subscription slot is effectively permanent, so it needs its own
 		// explicit opt-in. Driving it from an empty Subscription ID would mean an
 		// expression that happens to resolve to '' silently retires the channel.

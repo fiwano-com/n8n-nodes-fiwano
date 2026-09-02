@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TOOLDIR="node_modules/.verification-lint"
-PLUGIN_VERSION="0.29.0"
+PLUGIN_VERSION="0.31.0"
 ESLINT_VERSION="9"
 
 if [[ "${1:-}" == "--refresh" ]]; then rm -rf "$TOOLDIR"; fi

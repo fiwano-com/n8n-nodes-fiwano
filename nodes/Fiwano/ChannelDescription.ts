@@ -114,6 +114,13 @@ export const channelFields: INodeProperties[] = [
 		},
 		options: [
 			{
+				displayName: 'Track Echo Statuses',
+				name: 'echo_statuses',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to track delivered/read/failed statuses for echoed messages, delivered through your regular status events (no effect unless Message Echo is enabled; creates tracking records). Off = echo is a one-off copy with no status follow-ups. Instagram echoes get read only — Meta provides no delivered for them.',
+			},
+			{
 				displayName: 'Webhook URL',
 				name: 'webhook_url',
 				type: 'string',
@@ -127,7 +134,7 @@ export const channelFields: INodeProperties[] = [
 				type: 'string',
 				typeOptions: { password: true },
 				default: '',
-				description: 'HMAC-SHA256 secret for signature verification. Auto-generated if omitted.',
+				description: 'HMAC-SHA256 secret for signature verification (max 64 characters). Auto-generated if omitted.',
 			},
 			{
 				displayName: 'Webhook Events',
@@ -137,6 +144,7 @@ export const channelFields: INodeProperties[] = [
 				description: 'Event types to deliver to the webhook URL. By default no events are enabled — you must select at least one to receive webhooks. Available events depend on the channel type.',
 				options: [
 					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
+					{ name: 'Message Echo', value: 'message.echo', description: 'Copy of a message sent outside Fiwano (all channels; WhatsApp Coexistence numbers only)' },
 					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
 					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
 					{ name: 'Message Received', value: 'message.received', description: 'Incoming message from a user (all channels)' },
@@ -184,6 +192,13 @@ export const channelFields: INodeProperties[] = [
 					'stops media and template sending immediately.',
 			},
 			{
+				displayName: 'Track Echo Statuses',
+				name: 'echo_statuses',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to track delivered/read/failed statuses for echoed messages, delivered through your regular status events (no effect unless Message Echo is enabled; creates tracking records). Off = echo is a one-off copy with no status follow-ups. Instagram echoes get read only — Meta provides no delivered for them.',
+			},
+			{
 				displayName: 'Webhook Events',
 				name: 'webhook_events',
 				type: 'multiOptions',
@@ -191,6 +206,7 @@ export const channelFields: INodeProperties[] = [
 				description: 'Event types to deliver. Empty array disables all events. Available events depend on channel type.',
 				options: [
 					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
+					{ name: 'Message Echo', value: 'message.echo', description: 'Copy of a message sent outside Fiwano (all channels; WhatsApp Coexistence numbers only)' },
 					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
 					{ name: 'Message Read', value: 'message.read', description: 'Message read by recipient (all channels)' },
 					{ name: 'Message Received', value: 'message.received', description: 'Incoming message from a user (all channels)' },
@@ -203,7 +219,7 @@ export const channelFields: INodeProperties[] = [
 				type: 'string',
 				typeOptions: { password: true },
 				default: '',
-				description: 'New HMAC-SHA256 secret. Auto-generated if URL is set and secret is omitted.',
+				description: 'New HMAC-SHA256 secret (max 64 characters). Auto-generated if URL is set and secret is omitted.',
 			},
 			{
 				displayName: 'Webhook URL',
