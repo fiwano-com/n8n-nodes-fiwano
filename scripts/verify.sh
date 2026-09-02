@@ -133,17 +133,16 @@ if [[ $FULL -eq 1 ]]; then
   #     was rejected after publishing clean locally. Fail here so the pin gets
   #     refreshed before release. Network-only, so it lives in --full.
   gate "Verification ruleset is current" bash -c '
-    pinned=$(grep -oE "PLUGIN_VERSION=\"[0-9.]+\"" scripts/verification-lint.sh | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
-    portal=$(npm view @n8n/scan-community-package@latest dependencies --json 2>/dev/null \
-      | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{try{process.stdout.write(JSON.parse(s)[\"@n8n/eslint-plugin-community-nodes\"]||\"\")}catch(e){}})")
+    pinned=$(grep -oE "SCANNER_VERSION=\"[0-9.]+\"" scripts/verification-lint.sh | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+    portal=$(npm view @n8n/scan-community-package@latest version 2>/dev/null | tr -d "[:space:]")
     if [[ -z "$portal" ]]; then
-      printf "   could not read the Portal ruleset version from npm (offline?); skipping the drift check — the scanner gate below is the backstop\n"
+      printf "   could not read the scanner version from npm (offline?); skipping the drift check — the scanner gate below is the backstop\n"
       exit 0
     fi
-    printf "   pinned=%s  portal(@n8n/scan-community-package→community-nodes)=%s\n" "$pinned" "$portal"
+    printf "   pinned scanner=%s  latest @n8n/scan-community-package=%s\n" "$pinned" "$portal"
     if [[ "$pinned" != "$portal" ]]; then
-      printf "   STALE: the Creator Portal now uses %s but the local gate pins %s.\n" "$portal" "$pinned"
-      printf "   Fix: set PLUGIN_VERSION=\"%s\" in scripts/verification-lint.sh, run\n" "$portal"
+      printf "   STALE: the Creator Portal scanner is now %s but the local mirror pins %s.\n" "$portal" "$pinned"
+      printf "   Fix: set SCANNER_VERSION=\"%s\" in scripts/verification-lint.sh, run\n" "$portal"
       printf "   ./scripts/verification-lint.sh --refresh, resolve any new findings, then re-run.\n"
       exit 1
     fi

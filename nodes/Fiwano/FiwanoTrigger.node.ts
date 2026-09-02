@@ -98,28 +98,21 @@ export class FiwanoTrigger implements INodeType {
 				displayName: 'Event Types',
 				name: 'events',
 				type: 'multiOptions',
-				// Deliberate order — inbound → delivery lifecycle (delivered/read/failed)
-				// → sent → echo — matching how users reason about the message flow, not
-				// alphabetical. The Creator Portal verification ruleset
-				// (@n8n/eslint-plugin-community-nodes) does not require sorting; only this
-				// repo's stricter self-lint (eslint-plugin-n8n-nodes-base) does, so its
-				// sort rule is suppressed for this array.
-				// eslint-disable-next-line n8n-nodes-base/node-param-multi-options-type-unsorted-items
+				// Options MUST stay alphabetical by `name`: n8n's verification scanner
+				// enforces node-param-multi-options-type-unsorted-items and ignores inline
+				// suppression comments, so a custom order fails Creator Portal review (it
+				// did, on v1.3.0). Keep new events in alphabetical position.
 				options: [
-					{
-						name: 'Message Received',
-						value: 'message.received',
-						description: 'Incoming message from a user',
-					},
 					{
 						name: 'Message Delivered',
 						value: 'message.delivered',
 						description: 'Message delivered to the recipient',
 					},
 					{
-						name: 'Message Read',
-						value: 'message.read',
-						description: 'Recipient read the message',
+						name: 'Message Echo',
+						value: 'message.echo',
+						description:
+							'Copy of a message your business sent outside Fiwano — WhatsApp Business App, Instagram inbox, Facebook Page Inbox, Meta Business Suite, or another integration (WhatsApp Coexistence numbers only)',
 					},
 					{
 						name: 'Message Failed',
@@ -127,15 +120,19 @@ export class FiwanoTrigger implements INodeType {
 						description: 'Message delivery failed (WhatsApp only)',
 					},
 					{
+						name: 'Message Read',
+						value: 'message.read',
+						description: 'Recipient read the message',
+					},
+					{
+						name: 'Message Received',
+						value: 'message.received',
+						description: 'Incoming message from a user',
+					},
+					{
 						name: 'Message Sent',
 						value: 'message.sent',
 						description: 'Your message was accepted by Meta (WhatsApp only)',
-					},
-					{
-						name: 'Message Echo',
-						value: 'message.echo',
-						description:
-							'Copy of a message your business sent outside Fiwano — WhatsApp Business App, Instagram inbox, Facebook Page Inbox, Meta Business Suite, or another integration (WhatsApp Coexistence numbers only)',
 					},
 				],
 				default: ['message.received'],
