@@ -193,4 +193,39 @@ export const messageFields: INodeProperties[] = [
 			},
 		],
 	},
+
+	// ── Error on Failed Send ─────────────────────────────────────────────
+	// The API answers HTTP 200 for every send and reports the outcome in
+	// `success` / `status`. With this on, a `failed` outcome fails the node
+	// (or lands on the error output under On Error → Continue), so a rejected
+	// send can never pass as a green item. The default differs by node
+	// version on purpose: nodes saved before 1.4.0 (typeVersion 1) keep the
+	// legacy item-only behaviour they were built around; new nodes
+	// (typeVersion 2) get the safe default. Same name, same semantics.
+	{
+		displayName: 'Error on Failed Send',
+		name: 'errorOnSendFailure',
+		type: 'boolean',
+		default: true,
+		description:
+			'Whether to fail this node when Fiwano reports the send as failed (success: false, status: failed). ' +
+			'Turn off to receive the failed send as a normal item and branch on success yourself. ' +
+			'Sends Meta accepted (sent, queued) are never affected.',
+		displayOptions: {
+			show: { resource: ['message'], '@version': [2] },
+		},
+	},
+	{
+		displayName: 'Error on Failed Send',
+		name: 'errorOnSendFailure',
+		type: 'boolean',
+		default: false,
+		description:
+			'Whether to fail this node when Fiwano reports the send as failed (success: false, status: failed). ' +
+			'Off by default on nodes added before 1.4.0, where a failed send is returned as a normal item. ' +
+			'Sends Meta accepted (sent, queued) are never affected.',
+		displayOptions: {
+			show: { resource: ['message'], '@version': [1] },
+		},
+	},
 ];

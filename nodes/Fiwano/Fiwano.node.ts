@@ -10,7 +10,15 @@ import {
 	JsonObject,
 } from 'n8n-workflow';
 
-import { fiwanoApiRequest, fiwanoApiRequestBinary } from './GenericFunctions';
+import {
+	FiwanoSendFailedError,
+	SEND_OPERATIONS,
+	fiwanoApiRequest,
+	fiwanoApiRequestBinary,
+	fiwanoSendFailedError,
+	isFailedSend,
+	recipientProblem,
+} from './GenericFunctions';
 import { channelOperations, channelFields } from './ChannelDescription';
 import { messageOperations, messageFields } from './MessageDescription';
 import { templateOperations, templateFields } from './TemplateDescription';
@@ -25,7 +33,12 @@ export class Fiwano implements INodeType {
 		name: 'fiwano',
 		icon: { light: 'file:fiwano.svg', dark: 'file:fiwano.dark.svg' },
 		group: ['output'],
-		version: 1,
+		// Light versioning: one class, one execute(). Version 2 (1.4.0) changes a
+		// single default — "Error on Failed Send" is on — so a rejected send fails
+		// the node instead of passing as a green item. Nodes saved as version 1
+		// keep their behaviour forever; n8n never upgrades a saved node by itself.
+		version: [1, 2],
+		defaultVersion: 2,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Interact with Fiwano — unified API for WhatsApp, Instagram & Facebook Messenger',
 		defaults: { name: 'Fiwano' },
@@ -33,6 +46,20 @@ export class Fiwano implements INodeType {
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'fiwanoApi', required: true }],
+		hints: [
+			{
+				// Shown in the output pane before a run whenever the legacy behaviour
+				// is active, so a user of a version-1 node (or anyone who switched the
+				// option off) learns about it without reading the README.
+				message:
+					'Send operations answer HTTP 200 even when Meta rejects the message: the failed send comes back as a normal item with success: false and this node stays green. Turn on "Error on Failed Send" to fail the run instead, and use On Error → "Continue (using error output)" to branch on it.',
+				type: 'info',
+				location: 'outputPane',
+				whenToDisplay: 'beforeExecution',
+				displayCondition:
+					'={{ $parameter["resource"] === "message" && $parameter["errorOnSendFailure"] === false }}',
+			},
+		],
 		properties: [
 			{
 				displayName: 'Resource',
@@ -70,6 +97,10 @@ export class Fiwano implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
+		// Failed sends returned as items (option off) — surfaced as an execution
+		// hint after the loop so the outcome is visible in the editor even though
+		// the node stays green.
+		let failedSendsAsItems = 0;
 
 		for (let i = 0; i < items.length; i++) {
 			const resource = this.getNodeParameter('resource', i) as string;
@@ -96,6 +127,15 @@ export class Fiwano implements INodeType {
 					responseData = await executeChannel.call(this, operation, i);
 				} else if (resource === 'message') {
 					responseData = await executeMessage.call(this, operation, i);
+					if (SEND_OPERATIONS.has(operation) && isFailedSend(responseData)) {
+						// The default is version-dependent (see MessageDescription); the
+						// fallback only matters if the parameter is somehow unresolvable.
+						const failOnRejected = this.getNodeParameter('errorOnSendFailure', i, false) as boolean;
+						if (failOnRejected) {
+							throw fiwanoSendFailedError(this.getNode(), responseData, i);
+						}
+						failedSendsAsItems += 1;
+					}
 				} else if (resource === 'template') {
 					responseData = await executeTemplate.call(this, operation, i);
 				} else if (resource === 'contact') {
@@ -119,8 +159,30 @@ export class Fiwano implements INodeType {
 				);
 			} catch (error) {
 				if (this.continueOnFail()) {
+					// Two n8n rules (n8n-core WorkflowExecute, read from the compiled source)
+					// shape this item:
+					//  1. an item reaches the error output only if `item.error` is set or
+					//     its json is exactly {error} / {error, message};
+					//  2. any item with `item.error` set gets its json REPLACED by
+					//     {error: <message>} before it is stored.
+					// So a rejected send keeps its API response the only way both rules
+					// allow: json with the single key `error` holding an object. n8n then
+					// merges the paired input item's fields around it on the error output.
+					// Other failures keep the historical {error: <string>} shape.
+					const response = error instanceof FiwanoSendFailedError ? error.response : undefined;
+					const errorJson: IDataObject | string = response
+						? {
+								message: (error as Error).message,
+								hint: (error as NodeOperationError).description ?? null,
+								meta_error: (response.error as string | undefined) ?? null,
+								error_code: (response.error_code as number | undefined) ?? null,
+								status: (response.status as string | undefined) ?? 'failed',
+								message_id: (response.message_id as string | undefined) ?? null,
+								success: false,
+							}
+						: (error as Error).message;
 					returnData.push({
-						json: { error: (error as Error).message },
+						json: { error: errorJson },
 						pairedItem: { item: i },
 					});
 					continue;
@@ -133,6 +195,18 @@ export class Fiwano implements INodeType {
 					? error
 					: new NodeApiError(this.getNode(), error as JsonObject);
 			}
+		}
+
+		if (failedSendsAsItems > 0 && typeof this.addExecutionHints === 'function') {
+			// Older n8n versions have no execution hints; the guard keeps them working.
+			const count = failedSendsAsItems;
+			this.addExecutionHints({
+				message:
+					`${count} send${count === 1 ? ' was' : 's were'} rejected by Meta (success: false, status: failed) and returned as ${count === 1 ? 'a normal item' : 'normal items'} — this node stays green by design. ` +
+					'Turn on "Error on Failed Send" to fail the run instead, or branch on {{ $json.success }}.',
+				type: 'warning',
+				location: 'outputPane',
+			});
 		}
 
 		return [returnData];
@@ -244,7 +318,19 @@ async function executeMessage(
 	i: number,
 ): Promise<IDataObject> {
 	const channelId = this.getNodeParameter('channelId', i) as string;
-	const recipient = this.getNodeParameter('recipient', i) as string;
+	const rawRecipient: unknown = this.getNodeParameter('recipient', i);
+	// Strict subset of the API's `invalid_recipient` preflight (empty / no
+	// digits): the same request would get HTTP 400 anyway, this only names the
+	// fix — prod 2026-09-05: an expression resolving to undefined and to a whole
+	// object produced "" and "[object Object]" as recipients.
+	const problem = recipientProblem(rawRecipient);
+	if (problem) {
+		throw new NodeOperationError(this.getNode(), problem.message, {
+			itemIndex: i,
+			description: problem.description,
+		});
+	}
+	const recipient = String(rawRecipient);
 
 	if (operation === 'send') {
 		const text = this.getNodeParameter('text', i) as string;

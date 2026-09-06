@@ -43,6 +43,11 @@ gate "Backward-compatibility contract" node scripts/contract.mjs check
 #    API failure. 22 hostile shapes, including n8n-wrapped errors and buffers.
 gate "Error-mapper regression" node scripts/error-mapper.test.mjs
 
+# 4b. Send-result helpers: what turns a rejected send red, what the error says,
+#     and which recipients are refused before any request (must stay a strict
+#     subset of the API's own preflight).
+gate "Send-result regression" node scripts/send-result.test.mjs
+
 # 5. Headless load: n8n shows a "yellow node" when a description is malformed.
 #    Requiring the compiled classes and reading their properties catches that
 #    without a browser.

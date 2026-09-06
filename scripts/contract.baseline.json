@@ -2,7 +2,10 @@
   "nodes": {
     "fiwano": {
       "name": "fiwano",
-      "version": 1,
+      "version": [
+        1,
+        2
+      ],
       "credentials": [
         {
           "name": "fiwanoApi",
@@ -433,6 +436,34 @@
           "type": "string",
           "required": false,
           "displayOptions": null
+        },
+        "errorOnSendFailure[@version=2,resource=message]": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "@version": [
+                2
+              ]
+            }
+          }
+        },
+        "errorOnSendFailure[@version=1,resource=message]": {
+          "type": "boolean",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "@version": [
+                1
+              ]
+            }
+          }
         },
         "channelId[resource=template]": {
           "type": "string",

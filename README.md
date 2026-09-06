@@ -321,23 +321,83 @@ Statuses and echoes are delivered independently and at-least-once — a status c
 
 ### Reading the send result
 
-**A green node does not mean the message was sent.** All three send operations answer HTTP `200` even when the send fails, and report the outcome in the item's `success` and `status` fields. The node only turns red on transport and request errors (bad API key, no subscription, rate limit, malformed request) — a Meta-side send failure comes back as a normal, successful item.
+All three send operations answer HTTP `200` even when the send fails, and report the
+outcome in the item's `success` and `status` fields:
 
 | `status` | `success` | What it means |
 |---|---|---|
 | `sent` | `true` | Meta accepted it. Track the rest via `message.delivered` / `read` / `failed` webhooks. |
-| `queued` | `true` | Transient Meta failure. Fiwano retries in the background (7 attempts over ~20 min) and emails the channel owner if they run out. **Send Text and Send Media only** — templates are never queued. |
-| `failed` | `false` | Not retried. `error` explains it and `error_code` carries Meta's code when the failure came from Meta. |
+| `queued` | `true` | Meta did not give a final answer in time (transient failure, or a slow media download). Fiwano finishes the send in the background, retries transient failures (7 attempts over ~20 min), and emails the channel owner if they run out. Never resend a `queued` message yourself. **Send Text and Send Media only** — templates are never queued. |
+| `failed` | `false` | Meta rejected the message permanently. Not retried. `error` carries Meta's text and `error_code` Meta's code. The channel owner receives a delivery digest email. |
 
-So branch on the result rather than trusting the node's success state:
+`message_id` is a Fiwano UUID, not a Meta ID. Every later delivery-status webhook
+references that same UUID.
 
-```
-IF  {{ $json.success }}  is false   → your failure path
-```
+#### Error on Failed Send
 
-`status: "failed"` also covers the rare case where Meta accepted the send but its response never reached Fiwano. Those carry no `error_code` and are **deliberately not retried**, because an automatic retry could deliver the message twice — check the conversation before resending.
+What happens on `failed` is controlled by the **Error on Failed Send** option on the
+three send operations:
 
-`message_id` is a Fiwano UUID, not a Meta ID. Every later delivery-status webhook references that same UUID.
+- **On** (default on node version 2 — what you get when adding a Fiwano node): the node fails with
+  `Send failed: <Meta's text> (Meta error <code>)` and a hint on what to do. Handle it
+  like any other node error — with **Settings → On Error → "Continue (using error
+  output)"** the failed send lands on the node's error output as an item made of your
+  input fields plus an `error` **object**: `error.message`, `error.hint`,
+  `error.meta_error` (Meta's own text), `error.error_code`, `error.status`,
+  `error.message_id`, `error.success: false`. Branch on it directly, e.g.
+  `IF {{ $json.error.error_code }} is equal to 131047 → Send Template`. (Other node
+  errors, such as an empty recipient or an HTTP `400`, keep `error` as a plain string —
+  n8n itself allows an error-output item to carry nothing but `error`, so the object
+  is how the send outcome survives the trip.)
+- **Off** (default on node version 1): the failed send comes back as a normal item with
+  `success: false` and the node stays **green**.
+  Branch on it yourself:
+
+  ```
+  IF  {{ $json.success }}  is false   → your failure path
+  ```
+
+  A note in the output pane reminds you of this before a run, and after a run tells you
+  how many sends were rejected. **With the option off, "Continue (using error output)"
+  does not catch rejected sends** — n8n routes only thrown errors there, and a returned
+  item is not an error.
+
+A node's version is shown in its **Settings** tab and never changes on its own; the
+option can be switched either way on both versions. A version 1 node moves to version 2
+only by being replaced with a fresh Fiwano node from the palette.
+
+#### What the failure means
+
+`error_code` is Meta's code, passed through unchanged, and the error hint repeats the
+advice from this table:
+
+| `error_code` | What it means | What to do |
+|---|---|---|
+| `100` | Meta rejected a parameter (recipient, text, media URL or size) | Read `error`; check the recipient format, `media_url`, `media_type` and file size |
+| `10`, `200` | Meta denies this action for the account — **not** a token problem, the channel stays connected | Check the account in Meta Business Settings |
+| `190` | Access token expired or revoked | Reconnect the channel |
+| `551` | Messenger / Instagram: this person cannot be messaged now (blocked the Page, closed the chat, never messaged it) | Nothing on your side; only they can lift it. Do not resend automatically |
+| `803` | Meta does not know this recipient | Check the identifier |
+| `131026` | Recipient is not reachable on WhatsApp | Verify the number |
+| `131047`, `131057` | Outside the 24h window (WhatsApp) | Switch to Send Template |
+| `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
+| `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
+
+Codes outside the table are passed through as Meta returns them; the full list is in the
+[API documentation](https://fiwano.com/documentation/errors#send-error-codes).
+
+#### Requests Fiwano refuses before calling Meta
+
+These are ordinary node errors (HTTP `400`/`422`), independent of the option above:
+
+- **Recipient** empty, or without any digit (a common sign of a broken expression —
+  `{{ $json.data }}` becomes `[object Object]`, a missing field becomes empty), or not a
+  numeric PSID/IGSID on a Messenger/Instagram channel → `invalid_recipient`. The node
+  checks the first two cases itself before making the request and tells you to use
+  `{{ $json.data.from }}`. Note that delivery-status events (`delivered`, `read`) carry
+  `data.recipient`, not `data.from` — there is no sender to reply to.
+- **Text** empty or whitespace-only → `422`; over the channel limit → `text_too_long`.
+- A WhatsApp send to the channel's own number → `recipient_equals_sender`.
 
 ### Text message
 
@@ -348,7 +408,7 @@ Recipient: {{ $('Fiwano Trigger').item.json.data.from }}
 Text: Hello!
 ```
 
-Text must contain at least one non-whitespace character — empty or whitespace-only values are rejected with HTTP `422` before Meta is called. Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000; oversize text is rejected with `400`, and Fiwano does not auto-split.
+Text must contain at least one non-whitespace character — empty or whitespace-only values are rejected with HTTP `422` before Meta is called. Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000; oversize text is rejected with `400`, and Fiwano does not auto-split. The recipient is trimmed of surrounding whitespace and must contain digits (see [Requests Fiwano refuses before calling Meta](#requests-fiwano-refuses-before-calling-meta)).
 
 Sends are limited to **10 accepted sends per second per channel**, shared across all API keys. Exceeding it returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
 
@@ -400,14 +460,10 @@ Supported types per channel:
 | video | ✓ | ✓ | ✓ |
 | document | ✓ | ✓ | ✓ (as file) |
 
-**Handling errors.** On Meta-side failure the response carries `success: false` and `error_code` (Meta error code) — branch on it in your workflow:
-
-| `error_code` | What it means | What to do |
-|---|---|---|
-| `131052` | Meta could not download from URL | URL unreachable, expired signature, or wrong Content-Type — verify URL works in a fresh request |
-| `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
-| `131047`, `131057` | Outside 24h window (WhatsApp) | Switch to Send Template |
-| `190`, `200`, `10` | Token issue | Reconnect the channel |
+**Handling errors.** A media send that Meta rejects follows the same rules as text —
+see [Reading the send result](#reading-the-send-result). The media-specific codes are
+`131052` (Meta could not download the URL) and `131053` (format/size, or Meta
+rate-limited your hosting provider); `100` also covers a file above the size cap.
 
 > Channels without a Pro license return HTTP 402. Upgrade at [fiwano.com/billing](https://fiwano.com/billing).
 

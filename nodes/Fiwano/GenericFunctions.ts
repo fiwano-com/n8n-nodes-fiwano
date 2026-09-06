@@ -5,6 +5,7 @@ import {
 	INode,
 	JsonObject,
 	NodeApiError,
+	NodeOperationError,
 } from 'n8n-workflow';
 
 export interface MediaDownloadResult {
@@ -200,10 +201,22 @@ function describeDetail(detail: unknown): string | undefined {
 			.filter((part): part is string => Boolean(part));
 		return parts.length > 0 ? parts.join('; ') : undefined;
 	}
-	if (asRecord(detail)) {
-		return safeStringify(detail);
+	const record = asRecord(detail);
+	if (record) {
+		// Structured domain errors (`invalid_recipient`, `recipient_equals_sender`,
+		// `text_too_long`) carry the human-readable text in `message`; the raw
+		// JSON is only the fallback for shapes without one.
+		const message = typeof record.message === 'string' ? record.message.trim() : '';
+		return message || safeStringify(detail);
 	}
 	return undefined;
+}
+
+/** `hint` of a structured `detail`, when the API supplied one. */
+function detailHint(detail: unknown): string | undefined {
+	const record = asRecord(detail);
+	const hint = record && typeof record.hint === 'string' ? record.hint.trim() : '';
+	return hint || undefined;
 }
 
 /** Actionable next step per status, so the workflow author isn't left guessing. */
@@ -266,7 +279,9 @@ export function fiwanoApiError(node: INode, error: unknown, fallback: string): N
 
 	return new NodeApiError(node, payload, {
 		message,
-		description: statusHint(status, retryAfter),
+		// A structured detail's own `hint` names the fix for this exact request;
+		// the per-status hint is the generic fallback.
+		description: detailHint(body?.detail) ?? statusHint(status, retryAfter),
 		httpCode: status !== undefined ? String(status) : undefined,
 	});
 }
@@ -352,4 +367,140 @@ export async function fiwanoApiRequestBinary(
 		// 410 Gone is the common case here: inbound media expires 60 min after receipt.
 		throw fiwanoApiError(this.getNode(), error, 'Failed to download media file');
 	}
+}
+
+// ── Send results ─────────────────────────────────────────────────────────────
+
+/** Message operations whose HTTP 200 carries the real outcome in `success`/`status`. */
+export const SEND_OPERATIONS: ReadonlySet<string> = new Set(['send', 'sendMedia', 'sendTemplate']);
+
+/**
+ * True when a send response reports a permanent failure.
+ *
+ * The API answers `200` for every send and puts the outcome in the body:
+ * `sent` / `queued` are successes (`success: true`), `failed` is final and
+ * not retried (`success: false`). Both fields are checked so a response with
+ * only one of them still classifies correctly.
+ */
+export function isFailedSend(response: IDataObject | undefined): boolean {
+	if (!response || typeof response !== 'object') return false;
+	return response.status === 'failed' || response.success === false;
+}
+
+/**
+ * Actionable next step for a Meta send error code, mirroring the public
+ * "Send error codes" table so the workflow author is not left with only Meta's
+ * text. Codes outside the table get no hint rather than a guess.
+ */
+export function sendFailureHint(errorCode: unknown): string | undefined {
+	const code = typeof errorCode === 'number' ? errorCode : Number(errorCode);
+	switch (code) {
+		case 10:
+		case 200:
+			return 'Meta denies this action for the account. The channel stays connected; check the account in Meta Business Settings.';
+		case 100:
+			return 'Meta rejected a parameter. Check the recipient (phone number / PSID / IGSID), the text, or the media URL and size.';
+		case 190:
+			return 'The channel token is expired or revoked. Reconnect the channel in the Fiwano portal.';
+		case 368:
+			return 'The account is temporarily blocked for policy violations. Resolve it in Meta Business Manager.';
+		case 551:
+			return 'This person cannot be messaged right now (they blocked the Page, closed the chat, or never messaged it). Only they can lift it — do not resend automatically.';
+		case 803:
+			return 'Meta does not know this recipient. Check the identifier.';
+		case 131026:
+			return 'The recipient is not reachable on WhatsApp. Verify the number.';
+		case 131047:
+		case 131057:
+			return 'The 24-hour customer-service window is closed. Send an approved WhatsApp template instead (Send Template).';
+		case 131051:
+			return 'This message type is not supported on the channel. Check channel capabilities.';
+		case 131052:
+			return 'Meta could not download the media URL. Verify it returns 200 with the right Content-Type and that the signature has not expired.';
+		case 131053:
+			return 'Meta could not process the media. Check the format and size; if it persists, host on S3 / GCS / R2.';
+		default:
+			return undefined;
+	}
+}
+
+/**
+ * A send the API completed but Meta rejected permanently (`status: "failed"`).
+ *
+ * Raised only when the node's **Error on Failed Send** option is on. It keeps
+ * the full API response so the error-output item can carry `message_id`,
+ * `error_code` and `status` next to the error text.
+ */
+export class FiwanoSendFailedError extends NodeOperationError {
+	readonly response: IDataObject;
+
+	constructor(node: INode, response: IDataObject, itemIndex: number) {
+		const reason =
+			typeof response.error === 'string' && response.error.trim()
+				? response.error.trim()
+				: 'Meta rejected the message';
+		const code = response.error_code;
+		const suffix = code !== undefined && code !== null ? ` (Meta error ${String(code)})` : '';
+		super(node, `Send failed: ${reason}${suffix}`, {
+			itemIndex,
+			description:
+				sendFailureHint(code) ??
+				'Fiwano did not retry this send. Fix the cause before sending again; the channel owner also gets a delivery digest email.',
+		});
+		this.response = response;
+	}
+}
+
+/**
+ * Factory for {@link FiwanoSendFailedError}. execute() throws through this call
+ * rather than `throw new FiwanoSendFailedError(...)`: the n8n verification rule
+ * `node-execute-block-wrong-error-thrown` only accepts the core error classes
+ * in a `throw new` inside execute, and the instance is still a NodeOperationError.
+ */
+export function fiwanoSendFailedError(node: INode, response: IDataObject, itemIndex: number): NodeOperationError {
+	return new FiwanoSendFailedError(node, response, itemIndex);
+}
+
+// ── Recipient guard ──────────────────────────────────────────────────────────
+
+const RECIPIENT_HELP =
+	'To reply to the sender of a Fiwano Trigger event, use {{ $json.data.from }} (message.received). ' +
+	'Delivery-status events (delivered / read) carry data.recipient instead, and there is no sender to reply to.';
+
+/**
+ * Explain why a recipient value can never be sent, or return `undefined`.
+ *
+ * Deliberately a strict subset of the API's own `invalid_recipient` preflight:
+ * only an empty value and a value without any digit are refused here — both
+ * are impossible for every channel type (a phone number and every Meta user
+ * ID contain digits). The node does not know the channel type, so the
+ * numeric-only rule for Instagram/Facebook stays on the API side. Catching
+ * these locally gives the author a message that names the fix instead of a
+ * bare HTTP 400, and skips the request.
+ */
+export function recipientProblem(recipient: unknown): { message: string; description: string } | undefined {
+	if (recipient !== null && typeof recipient === 'object') {
+		return {
+			message: 'Recipient resolved to an object, not an identifier.',
+			description: `The expression returns a whole object — use its "from" field, e.g. {{ $json.data.from }} rather than {{ $json.data }}. ${RECIPIENT_HELP}`,
+		};
+	}
+	const value = recipient === undefined || recipient === null ? '' : String(recipient).trim();
+	if (!value) {
+		return {
+			message: 'Recipient is empty.',
+			description: `The Recipient expression resolved to nothing. ${RECIPIENT_HELP}`,
+		};
+	}
+	if (!/[0-9]/.test(value)) {
+		const shown = value.length > 40 ? `${value.slice(0, 40)}…` : value;
+		const objectLike = value.startsWith('[object');
+		return {
+			message: `Recipient "${shown}" contains no digits.`,
+			description: objectLike
+				? `The value is a serialized object — use its "from" field, e.g. {{ $json.data.from }} rather than {{ $json.data }}. ${RECIPIENT_HELP}`
+				: `A recipient is a phone number (WhatsApp), IGSID (Instagram) or PSID (Facebook), all numeric. ${RECIPIENT_HELP}`,
+		};
+	}
+	return undefined;
 }
