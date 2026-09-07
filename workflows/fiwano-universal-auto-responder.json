@@ -5,7 +5,7 @@
     {
       "parameters": {
         "content": "## Universal Auto-Responder\n### WhatsApp · Instagram · Facebook\n\n**One trigger, three channels.** A user messages any connected channel → instant reply. No per-channel code.\n\n- **Text** → echoed back.\n- **Anything else** (image, audio, video, document…) → a reply describing the attachment.\n\n### Before you start\n**Connect at least one channel first** — use the *Connect a Channel* workflow, or the [Fiwano portal](https://fiwano.com). The responder wires itself to channels you've already connected; with none connected, there's nothing to reply on.\n\n### Setup\n1. Add your **Fiwano API** credential to the Trigger and both reply nodes.\n2. *(Recommended)* Set a **Webhook Secret** on that **credential** — the Trigger uses it to verify incoming signatures. (The node's own Webhook Secret field is just an override; leave it empty to use the credential's.)\n3. **Save & Activate.**\n\n### What activation does\nThe Trigger is set to **Auto-Setup → All Active Channels**: on activation it points **every active channel** at this workflow at once — registering its webhook URL, the selected **Event Types**, and the credential's secret. Connect a channel later? Re-activate to wire it. Deactivating clears the webhook again.\n\nKeep **Event Types** on *Message Received*. n8n must be publicly reachable.\n\n[Docs](https://fiwano.com/documentation/n8n) · [Get an API key](https://fiwano.com)",
-        "height": 954,
+        "height": 1060,
         "width": 504,
         "color": 5
       },
@@ -74,7 +74,7 @@
         "text": "=You said: \"{{ $json.data.text }}\" 👋"
       },
       "type": "n8n-nodes-fiwano.fiwano",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [
         688,
         304
@@ -89,7 +89,7 @@
         "text": "=Got your {{ $json.data.type }} 📎 — {{ ($json.data.media || {}).mime_type || 'attachment' }}. Thanks!"
       },
       "type": "n8n-nodes-fiwano.fiwano",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [
         688,
         544
@@ -99,8 +99,8 @@
     },
     {
       "parameters": {
-        "content": "### 📥 What's in each message\n\nSame shape for all 3 channels (`$json` on the trigger):\n\n- `channel_id` — which channel\n- `data.from` — sender → use as reply recipient\n- `data.from_name` — name (WhatsApp only; `null` on IG/FB)\n- `data.type` — a **closed set**, safe to switch on: `text`, `image`, `audio`, `video`, `document`, `sticker` (WhatsApp only, inbound only), `unsupported`\n- `data.text` — the text (when `type = text`)\n- `data.caption` — text sent *with* a file (all channels)\n- `data.media` — `media_id`, `mime_type`, `file_size`, `filename`… (for media)\n\n`unsupported` means no file is coming: `data.unsupported_type` says what Meta sent, and `data.upgrade_required` marks the cases a **Pro** licence would have delivered.\n\nEach attachment of an album arrives as its **own** execution.\n\n### ⚠️ Sends answer HTTP 200 even when they fail\nThe reply node stays green either way — the outcome is in `success` and `status` (`sent` / `queued` / `failed`). Branch on `{{ $json.success }}` if a failed reply must be noticed.",
-        "height": 626,
+        "content": "### 📥 What's in each message\n\nSame shape for all 3 channels (`$json` on the trigger):\n\n- `channel_id` — which channel\n- `data.from` — sender → use as reply recipient\n- `data.from_name` — name (WhatsApp only; `null` on IG/FB)\n- `data.type` — a **closed set**, safe to switch on: `text`, `image`, `audio`, `video`, `document`, `sticker` (WhatsApp only, inbound only), `unsupported`\n- `data.text` — the text (when `type = text`)\n- `data.caption` — text sent *with* a file (all channels)\n- `data.media` — `media_id`, `mime_type`, `file_size`, `filename`… (for media)\n\n`unsupported` means no file is coming: `data.unsupported_type` says what Meta sent, and `data.upgrade_required` marks the cases a **Pro** licence would have delivered.\n\nEach attachment of an album arrives as its **own** execution.\n\n### ⚠️ When Meta rejects a reply\nMeta can refuse a reply — the person blocked the Page, a WhatsApp window closed, the ID is wrong. Both reply nodes have **Error on Failed Send** on, so a rejected reply **fails the node** with Meta's reason and a hint; accepted sends come back with `success: true` and `status` `sent` or `queued`. To handle rejections inside the flow instead, set the reply node's **Settings → On Error → Continue (using error output)** and branch on `{{ $json.error.error_code }}`.",
+        "height": 710,
         "width": 668,
         "color": 4
       },
@@ -116,7 +116,7 @@
     {
       "parameters": {
         "content": "## 📤 Sending media\n\n**Meta fetches outbound media by URL.** `Send Media` takes a `media_url` and Meta downloads it itself — so the file has to sit at an HTTPS address Meta can reach anonymously. Use a signed URL (S3/GCS/R2 presigned, Azure SAS) for anything non-public, with an expiry of ≥ 20 min so background retries still work. **Pro** licence required.\n\nThat is all you need for normal sending — pointing at your own images, invoices, reports.\n\n### Echoing a received file back\n\nExtra step, because the inbound `download_url` requires your `X-API-Key` and Meta will not send it. Fetch the bytes with **Media → Download**, then republish them somewhere Meta can fetch — your object storage, or any small HTTPS endpoint of your own. Files expire ~60 min after arrival.\n\n`sticker` is inbound-only (WhatsApp): re-send it as `image`.",
-        "height": 629,
+        "height": 700,
         "width": 420,
         "color": 7
       },
