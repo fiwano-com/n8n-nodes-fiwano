@@ -207,7 +207,13 @@ function describeDetail(detail: unknown): string | undefined {
 		// `text_too_long`) carry the human-readable text in `message`; the raw
 		// JSON is only the fallback for shapes without one.
 		const message = typeof record.message === 'string' ? record.message.trim() : '';
-		return message || safeStringify(detail);
+		if (!message) return safeStringify(detail);
+		// `no_free_slot` (409 on Generate OAuth URL) names the channels holding the
+		// subscription slots; without them the author cannot tell what to release.
+		const occupiedBy = Array.isArray(record.occupied_by)
+			? (record.occupied_by as unknown[]).filter((id): id is string => typeof id === 'string')
+			: [];
+		return occupiedBy.length > 0 ? `${message} Slots held by: ${occupiedBy.join(', ')}.` : message;
 	}
 	return undefined;
 }
@@ -225,9 +231,11 @@ function statusHint(status: number | undefined, retryAfter: string | undefined):
 		case 401:
 			return 'Check the API key on the Fiwano credential (it starts with mip_live_).';
 		case 402:
-			return 'The channel has no active subscription. Attach one in the Fiwano portal, or check Subscription → Get Many.';
+			return 'No active subscription on the account or channel. Add or renew one in the Fiwano portal (Billing), or check Subscription → Get Many.';
 		case 404:
 			return 'The resource does not exist, or it belongs to another Fiwano account.';
+		case 409:
+			return 'Every subscription slot for this channel type is taken. Reconnect one of those channels, release its slot (Channel → Deactivate, then Update → Release Subscription Slot), or add a subscription.';
 		case 410:
 			return 'Inbound media expires ~60 minutes after Fiwano receives it. Download it earlier in the workflow, or re-host what you need to keep.';
 		case 429:

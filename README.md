@@ -127,7 +127,7 @@ The API flow is Facebook OAuth, run once per channel (WhatsApp number / Instagra
 2. Open that URL in a browser and authorize the page(s)
 3. Add another **Fiwano** node → **Channel → Exchange OAuth Code**
    - Paste the `code` from the redirect URL query parameter — it is single-use and short-lived, so exchange it promptly
-   - On failure the redirect carries `error` instead: `access_denied` (user cancelled) or `setup_failed` (setup could not complete). **Branch on `error` only** — the companion `message` is free-form English for display and may change
+   - On failure the redirect carries `error` instead: `access_denied` (user cancelled or did not complete the Meta dialog), `slot_occupied` (the user connected a *different* Meta account than the one holding your subscription slot — `message` names the channel to reconnect or release), `session_expired` (the setup URL expired; generate a new one) or `setup_failed` (anything else). **Branch on `error` only** — the companion `message` is free-form English for display and may change
    - Optionally set `webhook_url` and `webhook_secret` in Additional Fields
 4. The response contains `channel_id` — save it for all subsequent nodes
 
@@ -152,6 +152,8 @@ Each subscription grants **one slot per channel type** — one WhatsApp, one Ins
 - `available_slots.<channel_type>.total > 0` means a **new** channel of that type can be connected.
 - It does **not** gate reconnecting an inactive channel: a deactivated channel keeps its slot, and that reserved slot is what lets you bring it back.
 - `assigned_channels` shows which channel sits in each slot. The reverse lookup is `subscription.id` on the channel itself in **Channel → Get Many**.
+
+**Generate OAuth URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
 
 **Deactivate is a soft delete.** It stops the channel sending and receiving, but keeps its ID, history and **its subscription slot**. Deactivating alone does not free a slot.
 

@@ -35,6 +35,12 @@ circular.detail.self = circular;
 const econn = Object.assign(new Error('connect ECONNREFUSED 1.2.3.4:443'), { code: 'ECONNREFUSED' });
 
 const SLOT = 'Subscription a1b2 already has a whatsapp channel (c3d4). Unbind or delete that channel first.';
+const NO_FREE_SLOT = {
+	code: 'no_free_slot',
+	message: 'Every active subscription already has a WhatsApp channel bound to it.',
+	occupied_by: ['chan_a1b2', 'chan_c3d4'],
+	hint: 'Reconnect one of these channels instead, release its slot (DELETE /api/v1/channels/{id}, then PATCH it with subscription_id ""), or add a subscription.',
+};
 
 /**
  * `expect` fields:
@@ -47,6 +53,8 @@ const CASES = [
 	['raw axios 400 (slot conflict)', axiosError(400, { detail: SLOT }), { contains: SLOT, status: 400 }],
 	['n8n-WRAPPED 400 (body only in context.data)', new NodeApiError(NODE, axiosError(400, { detail: SLOT })), { contains: SLOT, status: 400 }],
 	['n8n-WRAPPED 402', new NodeApiError(NODE, axiosError(402, { detail: 'No active subscription' })), { contains: 'No active subscription', status: 402 }],
+	['409 structured no_free_slot (setup-url)', axiosError(409, { detail: NO_FREE_SLOT }), { contains: 'Slots held by: chan_a1b2, chan_c3d4', status: 409, description: 'subscription_id' }],
+	['409 plain string falls back to the status hint', axiosError(409, { detail: 'Conflict' }), { contains: 'Conflict', status: 409, description: 'Release Subscription Slot' }],
 	['422 field list flattened', axiosError(422, { detail: [{ loc: ['body', 'text'], msg: 'Message text cannot be empty' }] }), { contains: 'text: Message text cannot be empty', status: 422 }],
 	['429 with Retry-After', axiosError(429, { detail: 'Rate limit exceeded' }, { 'retry-after': '3' }), { contains: 'Rate limit exceeded', status: 429, description: 'Retry after 3s' }],
 	['410 arraybuffer body (media download)', axiosError(410, Buffer.from(JSON.stringify({ detail: 'Media expired' }))), { contains: 'Media expired', status: 410 }],

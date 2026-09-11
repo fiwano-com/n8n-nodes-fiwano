@@ -23,7 +23,7 @@ export const channelOperations: INodeProperties = {
 			name: 'Generate OAuth URL',
 			value: 'setupUrl',
 			action: 'Generate a channel setup link',
-			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min.',
+			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min. Fails with 402 when the account has no active subscription, and with 409 when every subscription slot of that type is taken (the error names the channels holding them).',
 		},
 		{
 			name: 'Get',
