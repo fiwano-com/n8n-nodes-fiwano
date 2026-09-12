@@ -369,14 +369,33 @@ async function executeMessage(
 
 	if (operation === 'sendMedia') {
 		const mediaType = this.getNodeParameter('mediaType', i) as string;
-		const mediaUrl = this.getNodeParameter('mediaUrl', i) as string;
+		const mediaUrl = (this.getNodeParameter('mediaUrl', i, '') as string).trim();
+		const stickerId =
+			mediaType === 'sticker'
+				? (this.getNodeParameter('stickerId', i, '') as string).trim()
+				: '';
 		const extra = this.getNodeParameter('mediaAdditionalFields', i) as IDataObject;
 		const body: IDataObject = {
 			channel_id: channelId,
 			recipient,
 			media_type: mediaType,
-			media_url: mediaUrl,
 		};
+		// A sticker is a WebP file on WhatsApp (Media URL) or a catalog id on
+		// Facebook (Sticker ID); the API rejects the wrong field for the channel
+		// with 400 invalid_media_request. Every other media type needs the URL.
+		if (stickerId) {
+			body.sticker_id = stickerId;
+		} else if (mediaUrl) {
+			body.media_url = mediaUrl;
+		} else {
+			throw new NodeOperationError(
+				this.getNode(),
+				mediaType === 'sticker'
+					? 'Fill Media URL (WhatsApp WebP sticker) or Sticker ID (Facebook Messenger)'
+					: 'Media URL is required',
+				{ itemIndex: i },
+			);
+		}
 		if (extra.caption) body.caption = extra.caption;
 		if (extra.filename) body.filename = extra.filename;
 		return fiwanoApiRequest.call(this, 'POST', '/messages/send-media', body);

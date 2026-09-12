@@ -386,6 +386,7 @@
             "audio",
             "document",
             "image",
+            "sticker",
             "video"
           ],
           "displayOptions": {
@@ -401,7 +402,7 @@
         },
         "mediaUrl[operation=sendMedia,resource=message]": {
           "type": "string",
-          "required": true,
+          "required": false,
           "displayOptions": {
             "show": {
               "resource": [
@@ -409,6 +410,23 @@
               ],
               "operation": [
                 "sendMedia"
+              ]
+            }
+          }
+        },
+        "stickerId[mediaType=sticker,operation=sendMedia,resource=message]": {
+          "type": "string",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendMedia"
+              ],
+              "mediaType": [
+                "sticker"
               ]
             }
           }

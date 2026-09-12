@@ -248,9 +248,11 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.from }}` | Sender ID — use as `recipient` when replying |
 | `{{ $json.data.from_name }}` | Sender name (WhatsApp only; `null` on Instagram/Facebook) |
 | `{{ $json.data.text }}` | Message text (for `type: text` messages) |
-| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `sticker`, or `unsupported` |
+| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, or `unsupported` |
 | `{{ $json.data.media.media_id }}` | ID to download file via `GET /api/v1/media/{media_id}` (Pro license) |
 | `{{ $json.data.media.voice }}` | `true` for WhatsApp voice messages (boolean, WA only; omitted for IG/FB) |
+| `{{ $json.data.media.sticker }}` | `true` when the image is a sticker (WhatsApp WebP, Facebook); omitted for ordinary photos |
+| `{{ $json.data.media.sticker_id }}` | Facebook only — Meta's sticker id; send it back with Media Type `sticker` |
 | `{{ $json.data.media.download_url }}` | Authenticated download URL — fetch with your `X-API-Key`. `null` if download from Meta failed. **Cannot be used directly as `media_url` for outbound sends** — re-host the bytes first. |
 | `{{ $json.data.media.mime_type }}` | MIME type of the received file |
 | `{{ $json.data.media.file_size }}` | File size in bytes |
@@ -280,7 +282,7 @@ WhatsApp is unaffected — Meta already delivers each WhatsApp media message sep
 
 ### `type: "unsupported"`
 
-`data.type` is a closed set — `text`, `image`, `audio`, `video`, `document`, `sticker` (WhatsApp only), `unsupported` — and never a raw provider value, so it is safe to switch on. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
+`data.type` is `text`, `image`, `audio`, `video`, `document` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true`. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
 
 | Case | Looks like | What to do |
 |---|---|---|
@@ -302,7 +304,7 @@ A `message.echo` event uses the same envelope as every other event; the `data` b
 | `{{ $json.data.message_id }}` | A Fiwano UUID, **stable** across redeliveries — deduplicate on it |
 | `{{ $json.data.recipient }}` | Who the message was sent to, in the same format the send operations accept — reply to it directly |
 | `{{ $json.data.status }}` | Always `"sent"` (the message exists in the conversation; there is no separate `message.sent` for echoes) |
-| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `sticker`, or `unsupported` — same closed set as `message.received` |
+| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, or `unsupported` — same values as `message.received` |
 | `{{ $json.data.text }}` / `{{ $json.data.caption }}` | The text, or the caption on a media echo |
 
 > **Never mirror an echo back into the same conversation without deduplicating by `message_id`.** Your own reply generates no echo (Fiwano's sends are filtered out), but a bot on the other side — or a second integration echoing too — can create a loop.
@@ -461,6 +463,12 @@ Supported types per channel:
 | audio | ✓ | ✓ | ✓ |
 | video | ✓ | ✓ | ✓ |
 | document | ✓ | ✓ | ✓ (as file) |
+| sticker | ✓ Media URL = WebP file (512×512, ≤100 KB static / ≤500 KB animated) | ✗ | ✓ Sticker ID from Meta's catalog (`369239263222822` = thumbs up) or an inbound `data.media.sticker_id`; no file |
+
+**Stickers.** Choose Media Type `sticker`. On WhatsApp fill Media URL with a WebP;
+on Facebook leave it empty and fill **Sticker ID**. The wrong field for the channel
+(or any sticker on Instagram) returns HTTP 400 `invalid_media_request` before Meta is
+called. Caption and Filename are ignored for stickers.
 
 **Handling errors.** A media send that Meta rejects follows the same rules as text —
 see [Reading the send result](#reading-the-send-result). The media-specific codes are

@@ -136,6 +136,11 @@ export const messageFields: INodeProperties[] = [
 				description: 'WhatsApp, Instagram, Facebook',
 			},
 			{
+				name: 'Sticker',
+				value: 'sticker',
+				description: 'WhatsApp (WebP file via Media URL), Facebook (Meta catalog Sticker ID); not on Instagram',
+			},
+			{
 				name: 'Video',
 				value: 'video',
 				description: 'WhatsApp, Instagram, Facebook',
@@ -154,14 +159,30 @@ export const messageFields: INodeProperties[] = [
 		name: 'mediaUrl',
 		type: 'string',
 		default: '',
-		required: true,
 		placeholder: 'https://my-bucket.s3.amazonaws.com/photo.jpg?X-Amz-Signature=...',
 		description:
 			'HTTPS URL of the media file. Meta fetches it directly — Fiwano does not store it. ' +
 			'For non-public content use a signed URL (S3/GCS/R2 presigned, Azure SAS, or HMAC). ' +
-			'Public URLs are accessible to anyone who learns them. Max 2048 chars; no credentials in URL; no private IPs.',
+			'Public URLs are accessible to anyone who learns them. Max 2048 chars; no credentials in URL; no private IPs. ' +
+			'Required for every media type; for a Sticker it is the WhatsApp WebP file (512×512, ≤100 KB static / ≤500 KB animated) — leave it empty for a Facebook sticker and fill Sticker ID instead.',
 		displayOptions: {
 			show: { resource: ['message'], operation: ['sendMedia'] },
+		},
+	},
+
+	// ── Send Media: Sticker ID (Facebook Messenger) ───────────────────
+	{
+		displayName: 'Sticker ID',
+		name: 'stickerId',
+		type: 'string',
+		default: '',
+		placeholder: '369239263222822',
+		description:
+			'Facebook Messenger only: a sticker from Meta\'s catalog (369239263222822 is the thumbs up) ' +
+			'or the data.media.sticker_id of a sticker a user sent you. Leave Media URL empty. ' +
+			'On WhatsApp use Media URL with a WebP file instead.',
+		displayOptions: {
+			show: { resource: ['message'], operation: ['sendMedia'], mediaType: ['sticker'] },
 		},
 	},
 
