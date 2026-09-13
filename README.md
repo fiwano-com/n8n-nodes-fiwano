@@ -248,7 +248,11 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.from }}` | Sender ID — use as `recipient` when replying |
 | `{{ $json.data.from_name }}` | Sender name (WhatsApp only; `null` on Instagram/Facebook) |
 | `{{ $json.data.text }}` | Message text (for `type: text` messages) |
-| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, or `unsupported` |
+| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `share`, or `unsupported` (see below) |
+| `{{ $json.data.reply_to.message_id }}` | Present when the user replied to a specific message: the id you already hold for it — your send's `message_id` (UUID) or the `data.message_id` of an earlier inbound message (see below) |
+| `{{ $json.data.reply_to.story.url }}` | Instagram reply to your story: the story media link; `reply_to.story.id`, `.expires_at`, `.link_url` alongside |
+| `{{ $json.data.share_type }}` | On `type: "share"` — `post`, `reel`, or `story_mention` |
+| `{{ $json.data.share.url }}` | On `type: "share"` — link to the shared post / reel / story; `share.expires_at` is set for story mentions only |
 | `{{ $json.data.media.media_id }}` | ID to download file via `GET /api/v1/media/{media_id}` (Pro license) |
 | `{{ $json.data.media.voice }}` | `true` for WhatsApp voice messages (boolean, WA only; omitted for IG/FB) |
 | `{{ $json.data.media.sticker }}` | `true` when the image is a sticker (WhatsApp WebP, Facebook); omitted for ordinary photos |
@@ -260,7 +264,7 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.media.duration_ms }}` | Duration in ms (audio/video only; `null` otherwise) |
 | `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
 | `{{ $json.data.media.error }}` | Present only when Fiwano could not download the file from Meta; `download_url` is then `null` |
-| `{{ $json.data.caption }}` | Text Meta sent together with the media — all channels. Plain text messages use `data.text` instead |
+| `{{ $json.data.caption }}` | Text Meta sent together with the media (all channels), or the caption of a shared post / reel. Plain text messages use `data.text` instead |
 | `{{ $json.data.unsupported_type }}` | On `type: "unsupported"` — what Meta actually sent (see below) |
 | `{{ $json.data.upgrade_required }}` | `"pro"` if channel lacks a Pro license for this message |
 | `{{ $json.data.status }}` | On `message.delivered` / `read` / `failed` — `"delivered"`, `"read"`, `"failed"` |
@@ -280,16 +284,28 @@ What to rely on:
 
 WhatsApp is unaffected — Meta already delivers each WhatsApp media message separately.
 
+### Button taps and menu choices
+
+When a user picks one of the options you offered — a WhatsApp template quick-reply button, a WhatsApp interactive button or list row, an Instagram/Messenger quick reply, or a Messenger/Instagram postback (Get Started, ice breakers, persistent menu) — it arrives as an ordinary `type: "text"` whose `data.text` is the label the user saw. One text branch handles typed answers and taps alike; there is no separate event and no machine id for the button. Which message the button belonged to is in `data.reply_to` (a WhatsApp template tap always quotes the template send, so `reply_to.message_id` is the `message_id` you got from **Message → Send Template**).
+
+### Replies — `data.reply_to`
+
+When the user replies to a specific message (WhatsApp "Reply", Instagram/Messenger swipe-to-reply), `data.reply_to.message_id` is **the id you already have** for the quoted message: the Fiwano UUID if you sent it through Fiwano (or received it as `message.echo`), or the `data.message_id` of an earlier inbound message. Compare it with the ids you stored to know what was quoted. An Instagram reply to your story carries `data.reply_to.story` (`id`, `url`, `expires_at`, `link_url`) instead of a message id. `reply_to` is absent when the message is not a reply, and also appears on `message.echo`.
+
+### Shares — `type: "share"`
+
+On Instagram and Facebook Messenger a user can share a post or a reel into the chat, or mention your account in their story. These arrive as `type: "share"` with `data.share_type` (`post`, `reel`, `story_mention`), `data.share.url` (Meta's link to the content; a story mention links to the story media), `data.share.expires_at` (story mentions only — about 24 h) and `data.caption` (the post caption, when Meta provides it). Nothing is downloaded and there is no `data.media` block: a post belongs to its author, and Meta does not allow storing story media.
+
 ### `type: "unsupported"`
 
-`data.type` is `text`, `image`, `audio`, `video`, `document` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true`. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
+`data.type` is `text`, `image`, `audio`, `video`, `document`, `share` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true`. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
 
 | Case | Looks like | What to do |
 |---|---|---|
 | Media on a **Starter** license | `unsupported_type` is the media type (`image`, …) **and** `upgrade_required: "pro"` | Upgrade to Pro to receive the file |
-| Content that is not a file | `unsupported_type` is Meta's own name — `location`, `contacts` (WhatsApp), `share`, `ig_reel`, `story_mention`, `fallback`, `template` (Instagram/Facebook) — and **no** `upgrade_required` | No tier delivers these as files; handle or ignore |
+| Content that is not a file | `unsupported_type` is Meta's own name — `location`, `contacts`, `order`, `edit`, `nfm_reply`, … (WhatsApp); `template`, `ephemeral` (Instagram); `template`, `location`, `appointment_booking` (Facebook) — and **no** `upgrade_required` | No tier delivers these as files; handle or ignore |
 
-There is no `data.media` block on `unsupported`. An unfamiliar `unsupported_type` is still just unsupported content — treat the list as open. Message reactions are dropped entirely and never arrive as events.
+There is no `data.media` block on `unsupported`. An unfamiliar `unsupported_type` is still just unsupported content — treat the list as open. Message reactions, edits, deletions and WhatsApp group messages are dropped entirely and never arrive as events. A Messenger link preview never becomes `unsupported`: the text with the link arrives as `text`.
 
 ### Message echoes (messages sent outside Fiwano)
 
@@ -304,8 +320,9 @@ A `message.echo` event uses the same envelope as every other event; the `data` b
 | `{{ $json.data.message_id }}` | A Fiwano UUID, **stable** across redeliveries — deduplicate on it |
 | `{{ $json.data.recipient }}` | Who the message was sent to, in the same format the send operations accept — reply to it directly |
 | `{{ $json.data.status }}` | Always `"sent"` (the message exists in the conversation; there is no separate `message.sent` for echoes) |
-| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, or `unsupported` — same values as `message.received` |
+| `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `share`, or `unsupported` — same values as `message.received` |
 | `{{ $json.data.text }}` / `{{ $json.data.caption }}` | The text, or the caption on a media echo |
+| `{{ $json.data.reply_to.message_id }}` | When the operator replied to a specific customer message — that message's `data.message_id` |
 
 > **Never mirror an echo back into the same conversation without deduplicating by `message_id`.** Your own reply generates no echo (Fiwano's sends are filtered out), but a bot on the other side — or a second integration echoing too — can create a loop.
 
