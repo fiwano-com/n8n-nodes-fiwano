@@ -28,7 +28,7 @@ cd "$(dirname "$0")/.."
 TOOLDIR="node_modules/.verification-lint"
 # The scanner version whose ruleset we mirror. Keep in sync with npm (verify.sh
 # --full checks this) and bump deliberately, re-running to catch new rules.
-SCANNER_VERSION="0.35.0"
+SCANNER_VERSION="0.37.0"
 
 if [[ "${1:-}" == "--refresh" ]]; then rm -rf "$TOOLDIR"; fi
 

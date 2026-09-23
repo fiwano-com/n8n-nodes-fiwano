@@ -104,6 +104,12 @@ export class FiwanoTrigger implements INodeType {
 				// did, on v1.3.0). Keep new events in alphabetical position.
 				options: [
 					{
+						name: 'Conversation Referral',
+						value: 'conversation.referral',
+						description:
+							'A returning user clicked an ad or an m.me / ig.me link into an existing conversation without writing (Instagram and Facebook only) (beta)',
+					},
+					{
 						name: 'Message Delivered',
 						value: 'message.delivered',
 						description: 'Message delivered to the recipient',

@@ -235,6 +235,7 @@
           "type": "multiOptions",
           "required": false,
           "optionValues": [
+            "conversation.referral",
             "message.delivered",
             "message.echo",
             "message.failed",
@@ -282,6 +283,7 @@
           "type": "multiOptions",
           "required": false,
           "optionValues": [
+            "conversation.referral",
             "message.delivered",
             "message.echo",
             "message.failed",
@@ -797,6 +799,7 @@
           "type": "multiOptions",
           "required": false,
           "optionValues": [
+            "conversation.referral",
             "message.delivered",
             "message.echo",
             "message.failed",

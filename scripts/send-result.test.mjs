@@ -59,6 +59,9 @@ check('known Meta codes get a hint, unknown ones none, string codes accepted', (
 	assert.match(sendFailureHint(551), /blocked/i);
 	assert.match(sendFailureHint(10), /Business Settings/);
 	assert.match(sendFailureHint(190), /Reconnect/);
+	assert.match(sendFailureHint(133010), /WhatsApp Business App/);
+	// 131057 is maintenance mode (retried by Fiwano), not the closed 24h window.
+	assert.doesNotMatch(sendFailureHint(131057), /template|24-hour/i);
 	assert.equal(sendFailureHint(424242), undefined);
 	assert.equal(sendFailureHint(undefined), undefined);
 	assert.equal(sendFailureHint(null), undefined);

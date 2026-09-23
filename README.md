@@ -61,8 +61,9 @@ The trigger starts your workflow for any of these events:
 | `message.read` | WhatsApp, Instagram, Facebook |
 | `message.sent` | WhatsApp |
 | `message.failed` | WhatsApp |
+| `conversation.referral` (beta) | Instagram, Facebook |
 
-Filter by event type in node settings. HMAC-SHA256 signature verification is built in. `message.echo` is off by default — select **Message Echo** explicitly (see [Message echoes](#message-echoes-messages-sent-outside-fiwano)).
+Choose the events in the trigger's **Event Types** — a new trigger starts with **Message Received** only; nothing you have not selected is delivered. HMAC-SHA256 signature verification is built in.
 
 ---
 
@@ -265,6 +266,7 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
 | `{{ $json.data.media.error }}` | Present only when Fiwano could not download the file from Meta; `download_url` is then `null` |
 | `{{ $json.data.caption }}` | Text Meta sent together with the media (all channels), or the caption of a shared post / reel. Plain text messages use `data.text` instead |
+| `{{ $json.data.referral.text }}` | (beta) Present when the conversation started from an ad or an m.me / ig.me link: the ad copy the user saw; `referral.source`, `.image_url`, `.ref`, `.raw` alongside (see [Referral context](#referral-context--ads-and-links-beta)) |
 | `{{ $json.data.unsupported_type }}` | On `type: "unsupported"` — what Meta actually sent (see below) |
 | `{{ $json.data.upgrade_required }}` | `"pro"` if channel lacks a Pro license for this message |
 | `{{ $json.data.status }}` | On `message.delivered` / `read` / `failed` — `"delivered"`, `"read"`, `"failed"` |
@@ -296,6 +298,32 @@ When the user replies to a specific message (WhatsApp "Reply", Instagram/Messeng
 
 On Instagram and Facebook Messenger a user can share a post or a reel into the chat, or mention your account in their story. These arrive as `type: "share"` with `data.share_type` (`post`, `reel`, `story_mention`), `data.share.url` (Meta's link to the content; a story mention links to the story media), `data.share.expires_at` (story mentions only — about 24 h) and `data.caption` (the post caption, when Meta provides it). Nothing is downloaded and there is no `data.media` block: a post belongs to its author, and Meta does not allow storing story media.
 
+### Referral context — ads and links (beta)
+
+When a conversation starts from a Click-to-WhatsApp, Click-to-Instagram or Click-to-Messenger ad, or from an m.me / ig.me link with a `ref` parameter, the `message.received` that follows the click carries `data.referral`. An ice breaker or Get Started tap arrives as `type: "text"` and carries it the same way; for a message with several attachments it is on the first part only.
+
+> **Beta until November 2026.** This feature is new. The four normalised keys (`source`, `text`, `image_url`, `ref`) and the `conversation.referral` event may be adjusted; `raw` is guaranteed to stay exactly as it is, so anything built on `raw` is safe. If you plan to rely on the normalised keys or on `conversation.referral`, tell us at contact@fiwano.com: should anything change, we will let you know before it does. This note goes away once the shape is final.
+
+| Expression | Value |
+|---|---|
+| `{{ $json.data.referral.source }}` | `ad`, `link` (m.me / ig.me with `ref`), `product` (Instagram Shop). Open set: another value Meta reports arrives in lower case, `unknown` when Meta sent none |
+| `{{ $json.data.referral.text }}` | The ad copy the user saw (WhatsApp: headline and primary text joined by a newline; Instagram / Messenger: the ad title). `null` for links |
+| `{{ $json.data.referral.image_url }}` | The creative as an image — the picture of an image ad or the thumbnail of a video ad; `null` when Meta sends none |
+| `{{ $json.data.referral.ref }}` | Your own marker from the `ref` parameter of an m.me / ig.me link or an Instagram / Messenger ad. Always `null` on WhatsApp |
+| `{{ $json.data.referral.raw }}` | Meta's referral object exactly as received — ad id, `ctwa_clid` (WhatsApp, for the Conversions API), `welcome_message`, … Field names differ per channel |
+
+`text` and `image_url` are meant to go straight into an AI Agent prompt: the user is replying to an ad that said this and looked like this.
+
+**A returning user — `conversation.referral` (Instagram, Messenger).** When someone who already has a conversation with you clicks an ad or an m.me / ig.me link without writing, Meta sends the attribution as a separate event with no message: `data.from`, `data.from_name` and the same `data.referral` block. The click reopens the 24-hour window, so you may reply. Select **Conversation Referral** in the trigger's **Event Types** to receive it. WhatsApp has no equivalent — there the attribution always arrives with a message.
+
+What to expect:
+
+- **One-shot.** The block is on the event that follows the click and is not repeated on later messages — store it on the conversation when it arrives.
+- **Creative links are temporary.** `image_url` and the URLs in `raw` are public Meta CDN links with an undocumented lifetime; fetch the image when the event arrives if you want to keep it.
+- **No `referral` ≠ organic.** Only ads and `ref` links carry attribution; Meta may also omit `raw.ctwa_clid` (Status ads, web clicks, a deleted ad).
+
+Full contract: [Receiving Messages → Referral context](https://fiwano.com/documentation/webhooks#referral).
+
 ### `type: "unsupported"`
 
 `data.type` is `text`, `image`, `audio`, `video`, `document`, `share` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true`. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
@@ -311,7 +339,7 @@ There is no `data.media` block on `unsupported`. An unfamiliar `unsupported_type
 
 When someone on your side answers a customer **without going through Fiwano** — the WhatsApp Business App, the Instagram inbox, the Facebook Page Inbox, Meta Business Suite, or another integration — Meta echoes that message back, and Fiwano can deliver you a copy so your workflow sees the whole conversation, not just its own half.
 
-Enable it by selecting **Message Echo** in the trigger's **Event Types** (in auto-setup mode this registers `message.echo` on the channel). It is **off by default** on every plan, and leaving Event Types empty does **not** enable it — echo must be chosen explicitly. Available on Starter and Pro; on WhatsApp it fires only for **Coexistence** numbers (a Cloud-API-only channel has no external messages to echo).
+Enable it by selecting **Message Echo** in the trigger's **Event Types** (in auto-setup mode this registers `message.echo` on the channel). Available on Starter and Pro; on WhatsApp it fires only for **Coexistence** numbers (a Cloud-API-only channel has no external messages to echo).
 
 A `message.echo` event uses the same envelope as every other event; the `data` block looks like:
 
@@ -400,9 +428,10 @@ advice from this table:
 | `551` | Messenger / Instagram: this person cannot be messaged now (blocked the Page, closed the chat, never messaged it) | Nothing on your side; only they can lift it. Do not resend automatically |
 | `803` | Meta does not know this recipient | Check the identifier |
 | `131026` | Recipient is not reachable on WhatsApp | Verify the number |
-| `131047`, `131057` | Outside the 24h window (WhatsApp) | Switch to Send Template |
+| `131047` | Outside the 24h window (WhatsApp) | Switch to Send Template |
 | `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
 | `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
+| `133010` | The WhatsApp number is not registered on the WhatsApp Business Platform — the *WhatsApp Business App* connection was not completed | Reconnect the channel choosing *WhatsApp Business App* and finish the connection step in the app |
 
 Codes outside the table are passed through as Meta returns them; the full list is in the
 [API documentation](https://fiwano.com/documentation/errors#send-error-codes).

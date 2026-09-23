@@ -143,6 +143,7 @@ export const channelFields: INodeProperties[] = [
 				default: [],
 				description: 'Event types to deliver to the webhook URL. By default no events are enabled — you must select at least one to receive webhooks. Available events depend on the channel type.',
 				options: [
+					{ name: 'Conversation Referral', value: 'conversation.referral', description: 'Returning user clicked an ad or an m.me / ig.me link into an existing conversation without writing (Instagram and Facebook only) (beta)' },
 					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
 					{ name: 'Message Echo', value: 'message.echo', description: 'Copy of a message sent outside Fiwano (all channels; WhatsApp Coexistence numbers only)' },
 					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },
@@ -205,6 +206,7 @@ export const channelFields: INodeProperties[] = [
 				default: [],
 				description: 'Event types to deliver. Empty array disables all events. Available events depend on channel type.',
 				options: [
+					{ name: 'Conversation Referral', value: 'conversation.referral', description: 'Returning user clicked an ad or an m.me / ig.me link into an existing conversation without writing (Instagram and Facebook only) (beta)' },
 					{ name: 'Message Delivered', value: 'message.delivered', description: 'Message delivered to recipient (all channels)' },
 					{ name: 'Message Echo', value: 'message.echo', description: 'Copy of a message sent outside Fiwano (all channels; WhatsApp Coexistence numbers only)' },
 					{ name: 'Message Failed', value: 'message.failed', description: 'Message delivery failed (WhatsApp only)' },

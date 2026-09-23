@@ -419,7 +419,6 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 		case 131026:
 			return 'The recipient is not reachable on WhatsApp. Verify the number.';
 		case 131047:
-		case 131057:
 			return 'The 24-hour customer-service window is closed. Send an approved WhatsApp template instead (Send Template).';
 		case 131051:
 			return 'This message type is not supported on the channel. Check channel capabilities.';
@@ -427,6 +426,10 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 			return 'Meta could not download the media URL. Verify it returns 200 with the right Content-Type and that the signature has not expired.';
 		case 131053:
 			return 'Meta could not process the media. Check the format and size; if it persists, host on S3 / GCS / R2.';
+		case 131057:
+			return 'The WhatsApp Business Account is in maintenance mode (for example a throughput upgrade). Usually temporary; no action needed.';
+		case 133010:
+			return 'The WhatsApp number is not registered on the WhatsApp Business Platform: the WhatsApp Business App connection was not completed. Reconnect the channel choosing WhatsApp Business App and finish the connection step in the app.';
 		default:
 			return undefined;
 	}
