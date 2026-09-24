@@ -240,8 +240,8 @@ function statusHint(status: number | undefined, retryAfter: string | undefined):
 			return 'Inbound media expires ~60 minutes after Fiwano receives it. Download it earlier in the workflow, or re-host what you need to keep.';
 		case 429:
 			return retryAfter
-				? `Send rate limit reached (10 accepted sends per second per channel). Retry after ${retryAfter}s.`
-				: 'Send rate limit reached (10 accepted sends per second per channel). Back off and retry.';
+				? `Rate limit reached (10 accepted sends per second per channel; 20 requests per second per API key for everything else). Retry after ${retryAfter}s.`
+				: 'Rate limit reached (10 accepted sends per second per channel; 20 requests per second per API key for everything else). Back off and retry.';
 		case 502:
 			return 'Meta rejected or failed the upstream call. Retrying may help.';
 		case 503:

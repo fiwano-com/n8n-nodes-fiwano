@@ -460,7 +460,7 @@ Text: Hello!
 
 Text must contain at least one non-whitespace character — empty or whitespace-only values are rejected with HTTP `422` before Meta is called. Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000; oversize text is rejected with `400`, and Fiwano does not auto-split. The recipient is trimmed of surrounding whitespace and must contain digits (see [Requests Fiwano refuses before calling Meta](#requests-fiwano-refuses-before-calling-meta)).
 
-Sends are limited to **10 accepted sends per second per channel**, shared across all API keys. Exceeding it returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
+Sends are limited to **10 accepted sends per second per channel**, shared across all API keys; every other operation is limited to **20 requests per second per API key**. Exceeding either returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
 
 ### WhatsApp template
 
