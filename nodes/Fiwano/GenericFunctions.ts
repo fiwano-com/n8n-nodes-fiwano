@@ -418,6 +418,8 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 			return 'Meta does not know this recipient. Check the identifier.';
 		case 131026:
 			return 'The recipient is not reachable on WhatsApp. Verify the number.';
+		case 131042:
+			return 'Payment problem on the WhatsApp Business Account (for example no payment method attached). This is Meta billing, not your Fiwano subscription: fix billing for the account in Meta Business Settings, then resend.';
 		case 131047:
 			return 'The 24-hour customer-service window is closed. Send an approved WhatsApp template instead (Send Template).';
 		case 131051:

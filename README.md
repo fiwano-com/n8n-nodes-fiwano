@@ -302,7 +302,7 @@ On Instagram and Facebook Messenger a user can share a post or a reel into the c
 
 When a conversation starts from a Click-to-WhatsApp, Click-to-Instagram or Click-to-Messenger ad, or from an m.me / ig.me link with a `ref` parameter, the `message.received` that follows the click carries `data.referral`. An ice breaker or Get Started tap arrives as `type: "text"` and carries it the same way; for a message with several attachments it is on the first part only.
 
-> **Beta until November 2026.** This feature is new. The four normalised keys (`source`, `text`, `image_url`, `ref`) and the `conversation.referral` event may be adjusted; `raw` is guaranteed to stay exactly as it is, so anything built on `raw` is safe. If you plan to rely on the normalised keys or on `conversation.referral`, tell us at contact@fiwano.com: should anything change, we will let you know before it does. This note goes away once the shape is final.
+> **Beta until November 2026.** This feature is new. The four normalised keys (`source`, `text`, `image_url`, `ref`) and the `conversation.referral` event may be adjusted; `raw` is guaranteed to stay exactly as it is, so anything built on `raw` is safe. If you plan to rely on the normalised keys or on `conversation.referral`, tell us at support@fiwano.com: should anything change, we will let you know before it does. This note goes away once the shape is final.
 
 | Expression | Value |
 |---|---|
@@ -428,6 +428,7 @@ advice from this table:
 | `551` | Messenger / Instagram: this person cannot be messaged now (blocked the Page, closed the chat, never messaged it) | Nothing on your side; only they can lift it. Do not resend automatically |
 | `803` | Meta does not know this recipient | Check the identifier |
 | `131026` | Recipient is not reachable on WhatsApp | Verify the number |
+| `131042` | Payment problem on the WhatsApp Business account (no payment method attached, credit line over its limit, …) — Meta's billing, not your Fiwano subscription | Fix billing for the account in Meta, then resend (see below) |
 | `131047` | Outside the 24h window (WhatsApp) | Switch to Send Template |
 | `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
 | `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
@@ -435,6 +436,16 @@ advice from this table:
 
 Codes outside the table are passed through as Meta returns them; the full list is in the
 [API documentation](https://fiwano.com/documentation/errors#send-error-codes).
+
+**`131042` and WhatsApp replies from October 1, 2026.** Meta now bills replies inside the
+24h window beyond 1,000 free a month per number, not only templates. Without a payment
+method on the WhatsApp Business account, Meta stops delivering those replies once the
+1,000 are used. Send Template returns the error right away as `failed`. Send Text and
+Send Media come back `queued` and are retried for ~20 minutes, so fixing billing in that
+time still gets them out; after that the send stops and the channel owner is emailed.
+Meta may also accept a send and report `131042` later — that arrives as a
+`message.failed` webhook with the code in `data.errors`. See
+[Messaging Costs](https://fiwano.com/documentation/messaging-costs).
 
 #### Requests Fiwano refuses before calling Meta
 
