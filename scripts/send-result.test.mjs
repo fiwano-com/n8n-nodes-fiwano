@@ -61,8 +61,15 @@ check('known Meta codes get a hint, unknown ones none, string codes accepted', (
 	assert.match(sendFailureHint(190), /Reconnect/);
 	assert.match(sendFailureHint(133010), /WhatsApp Business App/);
 	assert.match(sendFailureHint(131042), /Meta billing/);
-	// 131057 is maintenance mode (retried by Fiwano), not the closed 24h window.
-	assert.doesNotMatch(sendFailureHint(131057), /template|24-hour/i);
+	// 131057 is maintenance mode, not the closed 24h window. A `failed` with it
+	// comes from Send Template (text/media are retried), so no "no action" advice.
+	assert.doesNotMatch(sendFailureHint(131057), /template|24-hour|no action/i);
+	assert.match(sendFailureHint(131056), /Wait/);
+	assert.match(sendFailureHint(132000), /variables/);
+	assert.match(sendFailureHint(132012), /variables/);
+	assert.match(sendFailureHint(132001), /approved in this language/);
+	assert.match(sendFailureHint(132015), /paused or disabled/);
+	assert.match(sendFailureHint(132016), /paused or disabled/);
 	assert.equal(sendFailureHint(424242), undefined);
 	assert.equal(sendFailureHint(undefined), undefined);
 	assert.equal(sendFailureHint(null), undefined);
@@ -88,6 +95,7 @@ check('send failure without error text or code still produces a usable message',
 	const err = new FiwanoSendFailedError(NODE, { success: false, status: 'failed' }, 0);
 	assert.equal(err.message.startsWith('Send failed: Meta rejected the message'), true);
 	assert.match(err.description ?? '', /did not retry/);
+	assert.match(err.description ?? '', /Send Text and Send Media/);
 });
 
 // ── recipientProblem — the strict subset of the API preflight ────────────────

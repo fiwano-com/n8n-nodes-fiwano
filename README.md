@@ -376,8 +376,8 @@ outcome in the item's `success` and `status` fields:
 | `status` | `success` | What it means |
 |---|---|---|
 | `sent` | `true` | Meta accepted it. Track the rest via `message.delivered` / `read` / `failed` webhooks. |
-| `queued` | `true` | Meta did not give a final answer in time (transient failure, or a slow media download). Fiwano finishes the send in the background, retries transient failures (7 attempts over ~20 min), and emails the channel owner if they run out. Never resend a `queued` message yourself. **Send Text and Send Media only** — templates are never queued. |
-| `failed` | `false` | Meta rejected the message permanently. Not retried. `error` carries Meta's text and `error_code` Meta's code. The channel owner receives a delivery digest email. |
+| `queued` | `true` | Meta did not give a final answer in time (transient failure, or a slow response — usually a large media download). Fiwano finishes the send in the background, retries transient failures (7 attempts over ~20 min), and emails the channel owner if they run out. Never resend a `queued` message yourself. Send Template is `queued` only when Meta answers slowly; a template is never retried or resent. |
+| `failed` | `false` | Not sent, and Fiwano will not retry it. `error` carries Meta's text and `error_code` Meta's code. For Send Text and Send Media the channel owner also receives a delivery digest email. |
 
 `message_id` is a Fiwano UUID, not a Meta ID. Every later delivery-status webhook
 references that same UUID.
@@ -432,6 +432,10 @@ advice from this table:
 | `131047` | Outside the 24h window (WhatsApp) | Switch to Send Template |
 | `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
 | `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
+| `131056`, `131057` | Send Template: too many messages to this recipient in a short time, or the WhatsApp Business account is in maintenance mode (Send Text / Send Media retry these and come back `queued`) | Wait, then send again |
+| `132000`, `132012` | Send Template: the variables do not match the template | Check the values and their count for each component |
+| `132001` | Send Template: Meta does not have this template approved in this language | Check the template name, language and status (Template → Get Many) |
+| `132015`, `132016` | Send Template: Meta paused or disabled the template (low quality) | Check it in WhatsApp Manager, or use another approved template |
 | `133010` | The WhatsApp number is not registered on the WhatsApp Business Platform — the *WhatsApp Business App* connection was not completed | Reconnect the channel choosing *WhatsApp Business App* and finish the connection step in the app |
 
 Codes outside the table are passed through as Meta returns them; the full list is in the

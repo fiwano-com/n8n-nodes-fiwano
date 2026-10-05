@@ -428,8 +428,18 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 			return 'Meta could not download the media URL. Verify it returns 200 with the right Content-Type and that the signature has not expired.';
 		case 131053:
 			return 'Meta could not process the media. Check the format and size; if it persists, host on S3 / GCS / R2.';
+		case 131056:
+			return 'Too many messages to this recipient in a short time. Wait before sending to them again.';
 		case 131057:
-			return 'The WhatsApp Business Account is in maintenance mode (for example a throughput upgrade). Usually temporary; no action needed.';
+			return 'The WhatsApp Business Account is in maintenance mode (for example a throughput upgrade). Usually temporary: send again later.';
+		case 132000:
+		case 132012:
+			return 'The template variables do not match the template. Check the values and their count for each component.';
+		case 132001:
+			return 'Meta does not have this template approved in this language. Check the template name, language and status (Template → Get Many).';
+		case 132015:
+		case 132016:
+			return 'Meta has paused or disabled this template (low quality). Check it in WhatsApp Manager, or use another approved template.';
 		case 133010:
 			return 'The WhatsApp number is not registered on the WhatsApp Business Platform: the WhatsApp Business App connection was not completed. Reconnect the channel choosing WhatsApp Business App and finish the connection step in the app.';
 		default:
@@ -438,7 +448,8 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 }
 
 /**
- * A send the API completed but Meta rejected permanently (`status: "failed"`).
+ * A send the API completed but Meta rejected (`status: "failed"`, final — Fiwano
+ * does not retry it).
  *
  * Raised only when the node's **Error on Failed Send** option is on. It keeps
  * the full API response so the error-output item can carry `message_id`,
@@ -458,7 +469,7 @@ export class FiwanoSendFailedError extends NodeOperationError {
 			itemIndex,
 			description:
 				sendFailureHint(code) ??
-				'Fiwano did not retry this send. Fix the cause before sending again; the channel owner also gets a delivery digest email.',
+				'Fiwano did not retry this send. Fix the cause before sending again; for Send Text and Send Media the channel owner also gets a delivery digest email.',
 		});
 		this.response = response;
 	}
