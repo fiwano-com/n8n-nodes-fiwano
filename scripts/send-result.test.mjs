@@ -25,8 +25,10 @@ const {
 	SEND_OPERATIONS,
 	fiwanoApiError,
 	isFailedSend,
+	pathSegment,
 	recipientProblem,
 	sendFailureHint,
+	templateVariables,
 } = require(join(ROOT, 'dist/nodes/Fiwano/GenericFunctions.js'));
 
 const NODE = { name: 'Fiwano', type: 'fiwano', typeVersion: 2, position: [0, 0], parameters: {} };
@@ -58,6 +60,11 @@ check('known Meta codes get a hint, unknown ones none, string codes accepted', (
 	assert.match(sendFailureHint('131047'), /template/i);
 	assert.match(sendFailureHint(551), /blocked/i);
 	assert.match(sendFailureHint(10), /Business Settings/);
+	// 10 has several causes; the hint must name the routing and 24h ones too.
+	assert.match(sendFailureHint(10), /Default routing app/);
+	assert.match(sendFailureHint(10), /24 hours/);
+	assert.match(sendFailureHint(200), /Business Settings/);
+	assert.doesNotMatch(sendFailureHint(200), /routing|24 hours/);
 	assert.match(sendFailureHint(190), /Reconnect/);
 	assert.match(sendFailureHint(133010), /WhatsApp Business App/);
 	assert.match(sendFailureHint(131042), /Meta billing/);
@@ -163,6 +170,31 @@ check('structured detail without message still falls back to JSON, without hint 
 	const mapped = fiwanoApiError(NODE, e, 'fallback');
 	assert.equal(mapped.message, 'Fiwano API error (HTTP 402): {"code":"pro_required"}');
 	assert.match(mapped.description ?? '', /subscription/i);
+});
+
+// ── pathSegment ──────────────────────────────────────────────────────────────
+check('path IDs: valid IDs unchanged, whitespace trimmed, URL syntax encoded', () => {
+	for (const id of ['a1b2c3d4e5f67890', '6543217890123456', '1234567890123', 'm1b2c3d4e5f67890']) {
+		assert.equal(pathSegment(id), id);
+	}
+	assert.equal(pathSegment('  a1b2c3d4e5f67890\n'), 'a1b2c3d4e5f67890');
+	assert.equal(pathSegment('abc?x=1#y'), 'abc%3Fx%3D1%23y');
+	assert.equal(pathSegment('a/b'), 'a%2Fb');
+	// Non-strings render exactly as the template literal did before.
+	assert.equal(pathSegment(123), '123');
+	assert.equal(pathSegment(undefined), 'undefined');
+});
+
+// ── templateVariables ────────────────────────────────────────────────────────
+check('template variables: string parsed, object passed, empty omitted, junk invalid', () => {
+	assert.deepEqual(templateVariables(''), {});
+	assert.deepEqual(templateVariables('   '), {});
+	assert.deepEqual(templateVariables(undefined), {});
+	assert.deepEqual(templateVariables('{"body":["a"]}'), { value: { body: ['a'] } });
+	const obj = { body: { name: 'Pablo' } };
+	assert.deepEqual(templateVariables(obj), { value: obj });
+	assert.deepEqual(templateVariables('{not json'), { invalid: true });
+	assert.deepEqual(templateVariables(42), { invalid: true });
 });
 
 console.log(`   ${checks} checks passed`);

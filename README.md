@@ -13,7 +13,7 @@ Key benefits:
 - **One API for three channels** — identical request format across WhatsApp, Instagram DM, and Facebook Messenger
 - **Real-time webhooks** — incoming messages and delivery statuses delivered to your endpoint, HMAC-signed
 - **WhatsApp template management** — create, manage, and send approved templates directly from the API
-- **Secure by default** — tokens encrypted at rest, no message content stored on Fiwano's side
+- **Secure by default** — tokens encrypted at rest, message content is not stored permanently
 
 Built for AI assistants, CRMs, helpdesks, and any product that needs conversational messaging at business scale.
 
@@ -60,7 +60,7 @@ The trigger starts your workflow for any of these events:
 | `message.delivered` | WhatsApp, Instagram, Facebook |
 | `message.read` | WhatsApp, Instagram, Facebook |
 | `message.sent` | WhatsApp |
-| `message.failed` | WhatsApp |
+| `message.failed` | WhatsApp, Instagram, Facebook |
 | `conversation.referral` (beta) | Instagram, Facebook |
 
 Choose the events in the trigger's **Event Types** — a new trigger starts with **Message Received** only; nothing you have not selected is delivered. HMAC-SHA256 signature verification is built in.
@@ -132,7 +132,7 @@ The API flow is Facebook OAuth, run once per channel (WhatsApp number / Instagra
    - Optionally set `webhook_url` and `webhook_secret` in Additional Fields
 4. The response contains `channel_id` — save it for all subsequent nodes
 
-The same **Generate OAuth URL** operation also **reconnects** an inactive channel — there is no separate reconnect operation. Run the flow again for the same Meta account and Fiwano reactivates the existing row, so **Exchange OAuth Code** returns the channel ID you already stored.
+The same **Generate OAuth URL** operation also **reconnects** an inactive channel — there is no separate reconnect operation. Run the flow again for the same Meta account and Fiwano updates the existing channel, so **Exchange OAuth Code** returns the channel ID you already stored.
 
 Alternatively, manage everything from the [Fiwano portal](https://fiwano.com) UI.
 
@@ -142,9 +142,19 @@ Alternatively, manage everything from the [Fiwano portal](https://fiwano.com) UI
 channel. Event delivery stops until a URL is set again; the channel keeps its secret and
 its event selection, so restoring is just setting the URL back.
 
-Leaving the **Webhook URL** field blank does *not* clear it — a blank value is ignored, so
-that an unfilled field can never silently stop delivery. Clearing is always the explicit
-toggle.
+Leaving the **Webhook URL** field blank does *not* clear it — clearing is always the
+explicit toggle.
+
+### Channel health
+
+Every channel returned by **Channel → Get** and **Channel → Get Many** carries `health`.
+`health.status` is `ok`, or `action_required` when Meta no longer lets Fiwano work with
+the account or number (access or a permission revoked, a WhatsApp number removed, an
+account blocked by Meta); `health.reason` is Meta's error text and `health.since` when it
+was detected. The channel stays active, but sends may fail until the cause is fixed in
+Meta or the same account is connected again with **Generate OAuth URL**. A scheduled
+workflow that checks `health.status` can alert you. See
+[Channel health](https://fiwano.com/documentation/channels#channel-health).
 
 ### Subscription slots
 
@@ -167,7 +177,7 @@ Channel → Generate OAuth URL    (user connects the new Meta account)
 Channel → Exchange OAuth Code   (new channel takes the freed slot)
 ```
 
-Setting **Subscription ID** to an actual ID instead **moves** the channel to that subscription — no downtime, and the channel does not have to be deactivated first. An empty Subscription ID is ignored; releasing is always the explicit toggle, so an expression that happens to resolve to empty can never retire a channel.
+Setting **Subscription ID** to an actual ID instead **moves** the channel to that subscription — no downtime, and the channel does not have to be deactivated first. An empty Subscription ID is ignored; releasing is always the explicit toggle.
 
 > **Releasing a slot is effectively permanent.** Once another channel takes the freed slot, the released one can no longer be reconnected until a slot is free again. Treat it as retiring that channel, not pausing it. Moving a channel to a **Starter** subscription stops media and template sending immediately.
 
@@ -195,11 +205,6 @@ Production URL, activation stops before changing any Fiwano channel and tells
 you to configure `WEBHOOK_URL`, restart n8n, or use Manual setup. A domain that
 merely contains the word `localhost` (for example `localhost.example.com`) is
 not treated as localhost.
-
-Official Fiwano nodes identify their API calls with a non-authentication client
-marker so channel webhook changes made by auto-setup can be distinguished from
-Portal and custom API changes in the Fiwano audit log. API-key authentication is
-unchanged.
 
 ### Option B — Manual setup
 
@@ -278,7 +283,7 @@ When a user sends an album (several files in one Instagram or Facebook message),
 
 What to rely on:
 
-- All files are downloaded **before the first event is sent**, then events arrive in Meta's attachment order.
+- Events arrive in Meta's attachment order.
 - `data.caption` is on the **first** event only.
 - The first event keeps Meta's own message ID; later parts get `.2`, `.3`, … appended. **Treat `data.message_id` as an opaque idempotency key** — do not parse the suffix and do not pass the ID back to Meta.
 - Retries are independent per event, so a failing endpoint can see a later part before a retried earlier one. Do not assume strict arrival order.
@@ -302,7 +307,7 @@ On Instagram and Facebook Messenger a user can share a post or a reel into the c
 
 When a conversation starts from a Click-to-WhatsApp, Click-to-Instagram or Click-to-Messenger ad, or from an m.me / ig.me link with a `ref` parameter, the `message.received` that follows the click carries `data.referral`. An ice breaker or Get Started tap arrives as `type: "text"` and carries it the same way; for a message with several attachments it is on the first part only.
 
-> **Beta until November 2026.** This feature is new. The four normalised keys (`source`, `text`, `image_url`, `ref`) and the `conversation.referral` event may be adjusted; `raw` is guaranteed to stay exactly as it is, so anything built on `raw` is safe. If you plan to rely on the normalised keys or on `conversation.referral`, tell us at support@fiwano.com: should anything change, we will let you know before it does. This note goes away once the shape is final.
+> **Beta until November 2026.** The four normalised keys (`source`, `text`, `image_url`, `ref`) and the `conversation.referral` event may be adjusted; `raw` is guaranteed to stay exactly as it is, so anything built on `raw` is safe. If you plan to rely on the normalised keys or on `conversation.referral`, tell us at support@fiwano.com: should anything change, we will let you know before it does.
 
 | Expression | Value |
 |---|---|
@@ -360,7 +365,7 @@ A `message.echo` event uses the same envelope as every other event; the `data` b
 
 #### Tracking delivery/read status for echoes
 
-By default an echo is a one-off copy with no `delivered`/`read` follow-ups. To get the same status lifecycle echoes as messages you send through Fiwano, turn on **Track Echo Statuses** on the channel via **Channel → Update** (or **Exchange OAuth Code**) — it maps to the API's `echo_statuses`. Subsequent `message.delivered` / `message.read` / `message.failed` webhooks then reference the same echo `message_id` and are filtered by your Event Types exactly like ordinary statuses (this creates tracking records on Fiwano's side).
+By default an echo is a one-off copy with no `delivered`/`read` follow-ups. To get the same status lifecycle echoes as messages you send through Fiwano, turn on **Track Echo Statuses** on the channel via **Channel → Update** (or **Exchange OAuth Code**) — it maps to the API's `echo_statuses`. Subsequent `message.delivered` / `message.read` / `message.failed` webhooks then reference the same echo `message_id` and are filtered by your Event Types exactly like ordinary statuses.
 
 Statuses and echoes are delivered independently and at-least-once — a status can occasionally arrive **before** the echo it belongs to. Correlate by `message_id` and upsert rather than relying on arrival order. WhatsApp/Facebook deliver both `delivered` and `read`; Instagram delivers only `read` (Meta does not provide `delivered`).
 
@@ -395,9 +400,7 @@ three send operations:
   `error.meta_error` (Meta's own text), `error.error_code`, `error.status`,
   `error.message_id`, `error.success: false`. Branch on it directly, e.g.
   `IF {{ $json.error.error_code }} is equal to 131047 → Send Template`. (Other node
-  errors, such as an empty recipient or an HTTP `400`, keep `error` as a plain string —
-  n8n itself allows an error-output item to carry nothing but `error`, so the object
-  is how the send outcome survives the trip.)
+  errors, such as an empty recipient or an HTTP `400`, keep `error` as a plain string.)
 - **Off** (default on node version 1): the failed send comes back as a normal item with
   `success: false` and the node stays **green**.
   Branch on it yourself:
@@ -423,7 +426,8 @@ advice from this table:
 | `error_code` | What it means | What to do |
 |---|---|---|
 | `100` | Meta rejected a parameter (recipient, text, media URL or size) | Read `error`; check the recipient format, `media_url`, `media_type` and file size |
-| `10`, `200` | Meta denies this action for the account — **not** a token problem, the channel stays connected | Check the account in Meta Business Settings |
+| `10` | Unrelated causes; the text in `error` says which: Messenger / Instagram 24-hour window closed, another app controls the conversation, the Page is restricted by Meta, or Meta denies the action for the account | Window: wait for the user to write again. Routing: make Fiwano the *Default routing app*. Restricted Page: check Account Quality in Meta Business Suite. Otherwise check the account in Meta Business Settings — see [Error 10](https://fiwano.com/documentation/errors#error-10) |
+| `200` | Meta does not allow this account to send — **not** a token problem, the channel stays connected | Check the account in Meta Business Settings |
 | `190` | Access token expired or revoked | Reconnect the channel |
 | `551` | Messenger / Instagram: this person cannot be messaged now (blocked the Page, closed the chat, never messaged it) | Nothing on your side; only they can lift it. Do not resend automatically |
 | `803` | Meta does not know this recipient | Check the identifier |
@@ -441,10 +445,10 @@ advice from this table:
 Codes outside the table are passed through as Meta returns them; the full list is in the
 [API documentation](https://fiwano.com/documentation/errors#send-error-codes).
 
-**`131042` and WhatsApp replies from October 1, 2026.** Meta now bills replies inside the
-24h window beyond 1,000 free a month per number, not only templates. Without a payment
-method on the WhatsApp Business account, Meta stops delivering those replies once the
-1,000 are used. Send Template returns the error right away as `failed`. Send Text and
+**`131042` and paid WhatsApp replies.** Replies inside the 24h window are free for the
+first 1,000 a month per number; Meta bills the replies after that, and every template.
+Without a payment method on the WhatsApp Business account, the free 1,000 still go out,
+and later replies fail with `131042`. Send Template returns the error right away as `failed`. Send Text and
 Send Media come back `queued` and are retried for ~20 minutes, so fixing billing in that
 time still gets them out; after that the send stops and the channel owner is emailed.
 Meta may also accept a send and report `131042` later — that arrives as a
@@ -473,7 +477,7 @@ Recipient: {{ $('Fiwano Trigger').item.json.data.from }}
 Text: Hello!
 ```
 
-Text must contain at least one non-whitespace character — empty or whitespace-only values are rejected with HTTP `422` before Meta is called. Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000; oversize text is rejected with `400`, and Fiwano does not auto-split. The recipient is trimmed of surrounding whitespace and must contain digits (see [Requests Fiwano refuses before calling Meta](#requests-fiwano-refuses-before-calling-meta)).
+Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000, and Fiwano does not auto-split. Empty text and invalid recipients are refused before Meta is called — see [Requests Fiwano refuses before calling Meta](#requests-fiwano-refuses-before-calling-meta).
 
 Sends are limited to **10 accepted sends per second per channel**, shared across all API keys; every other operation is limited to **20 requests per second per API key**. Exceeding either returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
 
@@ -602,4 +606,4 @@ n8n import:workflow --input=workflows/fiwano-universal-auto-responder.json
 
 ## License
 
-MIT — © Roman Babakin / [rmnbb.com](https://rmnbb.com)
+MIT — see [LICENSE](LICENSE)

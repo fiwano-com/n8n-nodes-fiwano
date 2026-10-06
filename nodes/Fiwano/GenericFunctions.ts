@@ -231,7 +231,7 @@ function statusHint(status: number | undefined, retryAfter: string | undefined):
 		case 401:
 			return 'Check the API key on the Fiwano credential (it starts with mip_live_).';
 		case 402:
-			return 'No active subscription on the account or channel. Add or renew one in the Fiwano portal (Billing), or check Subscription → Get Many.';
+			return 'No active subscription on the account or channel, or the feature (media, templates) needs Pro and the channel is on Starter. Add, renew or upgrade in the Fiwano portal (Billing), or check Subscription → Get Many.';
 		case 404:
 			return 'The resource does not exist, or it belongs to another Fiwano account.';
 		case 409:
@@ -345,7 +345,7 @@ export async function fiwanoApiRequestBinary(
 ): Promise<MediaDownloadResult> {
 	const options: IHttpRequestOptions = {
 		method: 'GET',
-		url: `${BASE_URL}/media/${mediaId}`,
+		url: `${BASE_URL}/media/${pathSegment(mediaId)}`,
 		headers: { 'X-Fiwano-Client': FIWANO_CLIENT_HEADER_VALUE },
 		encoding: 'arraybuffer',
 		returnFullResponse: true,
@@ -404,8 +404,9 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 	const code = typeof errorCode === 'number' ? errorCode : Number(errorCode);
 	switch (code) {
 		case 10:
+			return 'Meta returns 10 for unrelated causes; the error text says which. Messenger / Instagram: more than 24 hours since the user last wrote (wait for them to write again), Fiwano is not the app in control of the conversation (make Fiwano the Default routing app in the Page\'s conversation routing), or Meta restricted the Page from sending (check Account Quality in Meta Business Suite). Otherwise Meta denies this action for the account: check it in Meta Business Settings.';
 		case 200:
-			return 'Meta denies this action for the account. The channel stays connected; check the account in Meta Business Settings.';
+			return 'Meta does not allow this account to send. Not a token problem: the channel stays connected and keeps receiving. Check the account in Meta Business Settings.';
 		case 100:
 			return 'Meta rejected a parameter. Check the recipient (phone number / PSID / IGSID), the text, or the media URL and size.';
 		case 190:
@@ -502,6 +503,36 @@ const RECIPIENT_HELP =
  * these locally gives the author a message that names the fix instead of a
  * bare HTTP 400, and skips the request.
  */
+/**
+ * One ID as a URL path segment: surrounding whitespace removed (IDs pasted or
+ * built by expressions often carry it, and it turned a valid ID into a 404),
+ * then percent-encoded so `?`, `#` or `%` cannot change which URL is called.
+ * Every Fiwano ID is alphanumeric, so a valid ID comes out unchanged.
+ * `String()` keeps the previous handling of non-string values exactly.
+ */
+export function pathSegment(value: unknown): string {
+	return encodeURIComponent(String(value).trim());
+}
+
+/**
+ * Send Template's Variables parameter. A JSON string is parsed, an object from an
+ * expression is used as is, an empty value means "no variables". Anything else
+ * (an unparsable string, a number) is invalid.
+ */
+export function templateVariables(raw: unknown): { value?: unknown; invalid?: true } {
+	if (!raw) return {};
+	if (typeof raw === 'string') {
+		if (raw.trim() === '') return {};
+		try {
+			return { value: JSON.parse(raw) as unknown };
+		} catch {
+			return { invalid: true };
+		}
+	}
+	if (typeof raw === 'object') return { value: raw };
+	return { invalid: true };
+}
+
 export function recipientProblem(recipient: unknown): { message: string; description: string } | undefined {
 	if (recipient !== null && typeof recipient === 'object') {
 		return {

@@ -17,7 +17,9 @@ import {
 	fiwanoApiRequestBinary,
 	fiwanoSendFailedError,
 	isFailedSend,
+	pathSegment,
 	recipientProblem,
+	templateVariables,
 } from './GenericFunctions';
 import { channelOperations, channelFields } from './ChannelDescription';
 import { messageOperations, messageFields } from './MessageDescription';
@@ -225,7 +227,7 @@ async function executeChannel(
 	}
 	if (operation === 'get') {
 		const channelId = this.getNodeParameter('channelId', i) as string;
-		return fiwanoApiRequest.call(this, 'GET', `/channels/${channelId}`);
+		return fiwanoApiRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}`);
 	}
 	if (operation === 'setupUrl') {
 		const channelType = this.getNodeParameter('channelType', i) as string;
@@ -289,11 +291,11 @@ async function executeChannel(
 		// exactly as before. Rejecting it locally would be a nicer signal, but it
 		// would newly fail workflows whose fields come from expressions that can
 		// legitimately resolve to empty — not worth breaking on an upgrade.
-		return fiwanoApiRequest.call(this, 'PATCH', `/channels/${channelId}`, body);
+		return fiwanoApiRequest.call(this, 'PATCH', `/channels/${pathSegment(channelId)}`, body);
 	}
 	if (operation === 'delete') {
 		const channelId = this.getNodeParameter('channelId', i) as string;
-		return fiwanoApiRequest.call(this, 'DELETE', `/channels/${channelId}`);
+		return fiwanoApiRequest.call(this, 'DELETE', `/channels/${pathSegment(channelId)}`);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown channel operation: ${operation}`);
 }
@@ -344,26 +346,22 @@ async function executeMessage(
 	if (operation === 'sendTemplate') {
 		const templateName = this.getNodeParameter('templateName', i) as string;
 		const language = this.getNodeParameter('language', i) as string;
-		const variablesRaw = this.getNodeParameter('variables', i) as string;
+		// A JSON string from the editor, or an object from an expression.
+		const variables = templateVariables(this.getNodeParameter('variables', i));
 		const body: IDataObject = {
 			channel_id: channelId,
 			recipient,
 			template_name: templateName,
 			language,
 		};
-		if (variablesRaw && variablesRaw.trim() !== '') {
-			try {
-				body.variables = typeof variablesRaw === 'string'
-					? JSON.parse(variablesRaw)
-					: variablesRaw;
-			} catch {
-				throw new NodeOperationError(
-					this.getNode(),
-					'Variables must be a valid JSON object',
-					{ itemIndex: i },
-				);
-			}
+		if (variables.invalid) {
+			throw new NodeOperationError(
+				this.getNode(),
+				'Variables must be a valid JSON object',
+				{ itemIndex: i },
+			);
 		}
+		if ('value' in variables) body.variables = variables.value as IDataObject;
 		return fiwanoApiRequest.call(this, 'POST', '/messages/send-template', body);
 	}
 
@@ -418,12 +416,12 @@ async function executeTemplate(
 		const qs: IDataObject = {};
 		if (filters.status) qs.status = filters.status;
 		if (filters.sync !== undefined) qs.sync = String(filters.sync);
-		return fiwanoApiRequest.call(this, 'GET', `/channels/${channelId}/templates`, undefined, qs);
+		return fiwanoApiRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}/templates`, undefined, qs);
 	}
 
 	if (operation === 'get') {
 		const templateId = this.getNodeParameter('templateId', i) as string;
-		return fiwanoApiRequest.call(this, 'GET', `/channels/${channelId}/templates/${templateId}`);
+		return fiwanoApiRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}/templates/${pathSegment(templateId)}`);
 	}
 
 	if (operation === 'create') {
@@ -453,7 +451,7 @@ async function executeTemplate(
 		if (parameterFormat) {
 			body.parameter_format = parameterFormat;
 		}
-		return fiwanoApiRequest.call(this, 'POST', `/channels/${channelId}/templates`, body);
+		return fiwanoApiRequest.call(this, 'POST', `/channels/${pathSegment(channelId)}/templates`, body);
 	}
 
 	if (operation === 'update') {
@@ -479,7 +477,7 @@ async function executeTemplate(
 		return fiwanoApiRequest.call(
 			this,
 			'PUT',
-			`/channels/${channelId}/templates/${templateId}`,
+			`/channels/${pathSegment(channelId)}/templates/${pathSegment(templateId)}`,
 			updateBody,
 		);
 	}
@@ -492,7 +490,7 @@ async function executeTemplate(
 		return fiwanoApiRequest.call(
 			this,
 			'DELETE',
-			`/channels/${channelId}/templates/${templateId}`,
+			`/channels/${pathSegment(channelId)}/templates/${pathSegment(templateId)}`,
 			undefined,
 			qs,
 		);
@@ -511,7 +509,7 @@ async function executeContact(
 	if (operation === 'getProfile') {
 		const channelId = this.getNodeParameter('channelId', i) as string;
 		const userId = this.getNodeParameter('userId', i) as string;
-		return fiwanoApiRequest.call(this, 'GET', `/channels/${channelId}/profile/${userId}`);
+		return fiwanoApiRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}/profile/${pathSegment(userId)}`);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown contact operation: ${operation}`);
 }
@@ -532,7 +530,7 @@ async function executeRedirect(
 	}
 	if (operation === 'delete') {
 		const redirectId = this.getNodeParameter('redirectId', i) as string;
-		return fiwanoApiRequest.call(this, 'DELETE', `/redirects/${redirectId}`);
+		return fiwanoApiRequest.call(this, 'DELETE', `/redirects/${pathSegment(redirectId)}`);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown redirect operation: ${operation}`);
 }

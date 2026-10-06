@@ -10,7 +10,7 @@ import {
 	IWebhookResponseData,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { FIWANO_CLIENT_HEADER_VALUE, fiwanoApiError } from './GenericFunctions';
+import { FIWANO_CLIENT_HEADER_VALUE, fiwanoApiError, pathSegment } from './GenericFunctions';
 
 const BASE_URL = 'https://fiwano.com/api/v1';
 
@@ -91,7 +91,7 @@ export class FiwanoTrigger implements INodeType {
 				typeOptions: { password: true },
 				default: '',
 				description:
-					'Secret used to verify HMAC-SHA256 signatures on incoming webhooks. In auto-setup mode it is also pushed to the channel(s). If left empty, the node falls back to the Webhook Secret stored on the Fiwano API credential; if that is also empty, signature verification is skipped (not recommended in production) and Fiwano keeps/generates its own secret.',
+					'Secret used to verify HMAC-SHA256 signatures on incoming webhooks. In auto-setup mode it is also pushed to the channel(s). If left empty, the node falls back to the Webhook Secret stored on the Fiwano API credential; if that is also empty, signature verification is skipped (not recommended in production).',
 				hint: 'Overrides the credential\'s Webhook Secret. Leave empty to use the credential default.',
 			},
 			{
@@ -123,7 +123,7 @@ export class FiwanoTrigger implements INodeType {
 					{
 						name: 'Message Failed',
 						value: 'message.failed',
-						description: 'Message delivery failed (WhatsApp only)',
+						description: 'Your message could not be delivered (all channels)',
 					},
 					{
 						name: 'Message Read',
@@ -196,7 +196,7 @@ export class FiwanoTrigger implements INodeType {
 					if (mode === 'channel') {
 						const channelId = (this.getNodeParameter('channelId', '') as string).trim();
 						if (!channelId) return false;
-						const ch = await fiwanoHookRequest.call(this, 'GET', `/channels/${channelId}`);
+						const ch = await fiwanoHookRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}`);
 						return wiredOk(ch);
 					}
 
@@ -264,7 +264,7 @@ export class FiwanoTrigger implements INodeType {
 						);
 					}
 					// Specific Channel takes the channel over explicitly.
-					await fiwanoHookRequest.call(this, 'PATCH', `/channels/${channelId}`, body);
+					await fiwanoHookRequest.call(this, 'PATCH', `/channels/${pathSegment(channelId)}`, body);
 					return true;
 				}
 
@@ -284,7 +284,7 @@ export class FiwanoTrigger implements INodeType {
 						// Leave channels pointing at another URL untouched.
 						continue;
 					}
-					await fiwanoHookRequest.call(this, 'PATCH', `/channels/${ch.id}`, body);
+					await fiwanoHookRequest.call(this, 'PATCH', `/channels/${pathSegment(ch.id)}`, body);
 					wired += 1;
 				}
 
@@ -312,11 +312,11 @@ export class FiwanoTrigger implements INodeType {
 					if (mode === 'channel') {
 						const channelId = (this.getNodeParameter('channelId', '') as string).trim();
 						if (channelId) {
-							const ch = await fiwanoHookRequest.call(this, 'GET', `/channels/${channelId}`);
+							const ch = await fiwanoHookRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}`);
 							// Only clear if it still points at us (another workflow may have
 							// taken it over since).
 							if (isOurs(ch, url)) {
-								await fiwanoHookRequest.call(this, 'PATCH', `/channels/${channelId}`, {
+								await fiwanoHookRequest.call(this, 'PATCH', `/channels/${pathSegment(channelId)}`, {
 									webhook_url: '',
 								});
 							}
@@ -328,7 +328,7 @@ export class FiwanoTrigger implements INodeType {
 						const channels = (resp.channels as IDataObject[]) || [];
 						for (const ch of channels) {
 							if (isOurs(ch, url)) {
-								await fiwanoHookRequest.call(this, 'PATCH', `/channels/${ch.id}`, {
+								await fiwanoHookRequest.call(this, 'PATCH', `/channels/${pathSegment(ch.id)}`, {
 									webhook_url: '',
 								});
 							}

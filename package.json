@@ -13,8 +13,9 @@
   "license": "MIT",
   "homepage": "https://fiwano.com",
   "author": {
-    "name": "Roman Babakin",
-    "email": "contact@fiwano.com"
+    "name": "Fiwano",
+    "email": "contact@fiwano.com",
+    "url": "https://fiwano.com"
   },
   "repository": {
     "type": "git",
