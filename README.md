@@ -270,7 +270,7 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.media.duration_ms }}` | Duration in ms (audio/video only; `null` otherwise) |
 | `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
 | `{{ $json.data.media.error }}` | Present only when Fiwano could not download the file from Meta; `download_url` is then `null` |
-| `{{ $json.data.caption }}` | Text Meta sent together with the media (all channels), or the caption of a shared post / reel. Plain text messages use `data.text` instead |
+| `{{ $json.data.caption }}` | Text the user wrote together with media or a share (all channels). Plain text messages use `data.text` instead |
 | `{{ $json.data.referral.text }}` | (beta) Present when the conversation started from an ad or an m.me / ig.me link: the ad copy the user saw; `referral.source`, `.image_url`, `.ref`, `.raw` alongside (see [Referral context](#referral-context--ads-and-links-beta)) |
 | `{{ $json.data.unsupported_type }}` | On `type: "unsupported"` — what Meta actually sent (see below) |
 | `{{ $json.data.upgrade_required }}` | `"pro"` if channel lacks a Pro license for this message |
@@ -301,7 +301,7 @@ When the user replies to a specific message (WhatsApp "Reply", Instagram/Messeng
 
 ### Shares — `type: "share"`
 
-On Instagram and Facebook Messenger a user can share a post or a reel into the chat, or mention your account in their story. These arrive as `type: "share"` with `data.share_type` (`post`, `reel`, `story_mention`), `data.share.url` (Meta's link to the content; a story mention links to the story media), `data.share.expires_at` (story mentions only — about 24 h) and `data.caption` (the post caption, when Meta provides it). Nothing is downloaded and there is no `data.media` block: a post belongs to its author, and Meta does not allow storing story media.
+On Instagram and Facebook Messenger a user can share a post or a reel into the chat, or mention your account in their story. These arrive as `type: "share"` with `data.share_type` (`post`, `reel`, `story_mention`), `data.share.url` (Meta's link to the content; a story mention links to the story media), `data.share.expires_at` (story mentions only — about 24 h) and `data.caption` (text the user wrote with the share, if any — the shared post's own caption is not included). Nothing is downloaded and there is no `data.media` block: a post belongs to its author, and Meta does not allow storing story media.
 
 ### Referral context — ads and links (beta)
 
