@@ -497,7 +497,22 @@ Variables: {"body": ["John", "ORD-456"]}
 Variable format:
 - **Positional** (numbered `{{1}}`, `{{2}}`): `{"body": ["val1", "val2"], "header": ["val"], "buttons": [{"index": 0, "value": "abc"}]}`
 - **Named** (custom keys): `{"body": {"customer_name": "John"}}`
+- **Authentication** (one-time code): `{"body": ["482913"]}` — the code also fills the copy-code button
 - Leave empty if the template has no variables
+
+**Media header.** If the template header is an image, video or document (`variables.header_media` in **Template → Get**), pass the file in **Additional Fields → Header Media URL** — an HTTPS URL Meta downloads, as in Send Media.
+
+**Managing templates.** Templates belong to the WhatsApp Business Account, so every number of the same account lists and sends the same ones. **Template → Get Many / Get** always return the current status from Meta; a `REJECTED` template carries Meta's `rejected_reason`, an approved one its `quality_score` (`GREEN`, `YELLOW`, `RED`, `UNKNOWN`). **Template → Create** takes a text header only; create image, video and document headers in the Fiwano portal. For an `AUTHENTICATION` template Meta sets the text — the components are the extras and one copy-code button:
+
+```json
+[
+  {"type": "BODY", "add_security_recommendation": true},
+  {"type": "FOOTER", "code_expiration_minutes": 10},
+  {"type": "BUTTONS", "buttons": [{"type": "OTP", "otp_type": "COPY_CODE", "text": "Copy code"}]}
+]
+```
+
+**Additional Fields → Message TTL (Seconds)** on Create sets how long Meta keeps trying to deliver a message sent with the template.
 
 ### Media message (image, audio, video, document)
 

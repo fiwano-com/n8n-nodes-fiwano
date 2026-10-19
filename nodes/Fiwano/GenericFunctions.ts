@@ -247,7 +247,7 @@ function statusHint(status: number | undefined, retryAfter: string | undefined):
 		case 503:
 			return retryAfter
 				? `Fiwano is shedding load temporarily. Retry after ${retryAfter}s.`
-				: 'Fiwano is shedding load temporarily. Retry shortly.';
+				: 'Fiwano or Meta is temporarily unavailable (for example, a template status could not be confirmed with Meta). Retry shortly.';
 		default:
 			return undefined;
 	}

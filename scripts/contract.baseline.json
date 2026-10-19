@@ -381,6 +381,25 @@
             }
           }
         },
+        "templateAdditionalFields[operation=sendTemplate,resource=message]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendTemplate"
+              ]
+            }
+          }
+        },
+        "templateAdditionalFields[operation=sendTemplate,resource=message].headerMediaUrl": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
         "mediaType[operation=sendMedia,resource=message]": {
           "type": "options",
           "required": true,
@@ -532,6 +551,8 @@
           "optionValues": [
             "",
             "APPROVED",
+            "DISABLED",
+            "PAUSED",
             "PENDING",
             "REJECTED"
           ],
@@ -636,6 +657,25 @@
               ]
             }
           }
+        },
+        "createAdditionalFields[operation=create,resource=template]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "template"
+              ],
+              "operation": [
+                "create"
+              ]
+            }
+          }
+        },
+        "createAdditionalFields[operation=create,resource=template].messageSendTtlSeconds": {
+          "type": "number",
+          "required": false,
+          "displayOptions": null
         },
         "allLanguages[operation=delete,resource=template]": {
           "type": "boolean",

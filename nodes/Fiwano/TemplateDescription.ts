@@ -86,11 +86,13 @@ export const templateFields: INodeProperties[] = [
 				options: [
 					{ name: 'All', value: '' },
 					{ name: 'Approved', value: 'APPROVED' },
+					{ name: 'Disabled', value: 'DISABLED' },
+					{ name: 'Paused', value: 'PAUSED' },
 					{ name: 'Pending', value: 'PENDING' },
 					{ name: 'Rejected', value: 'REJECTED' },
 				],
 				default: '',
-				description: 'Filter templates by approval status',
+				description: 'Filter templates by status. Meta pauses or disables an approved template for low quality.',
 			},
 			// `sync` was removed: the API refreshes templates from Meta on every read and
 			// ignores it. n8n drops a saved key of an undeclared collection option on load.
@@ -150,7 +152,7 @@ export const templateFields: INodeProperties[] = [
 		type: 'json',
 		default: '[\n  {\n    "type": "BODY",\n    "text": "Hello {{1}}!",\n    "example": { "body_text": [["World"]] }\n  }\n]',
 		required: true,
-		description: 'Template components as JSON array. BODY is required. HEADER (text only), FOOTER, BUTTONS optional. Include "example" for Meta review.',
+		description: 'Template components as JSON array. BODY is required. HEADER (text only; media headers are created in the Fiwano portal), FOOTER, BUTTONS optional. Include "example" for Meta review. AUTHENTICATION: Meta sets the text — see the docs for the copy-code form.',
 		displayOptions: {
 			show: { resource: ['template'], operation: ['create', 'update'] },
 		},
@@ -197,6 +199,28 @@ export const templateFields: INodeProperties[] = [
 		displayOptions: {
 			show: { resource: ['template'], operation: ['create'] },
 		},
+	},
+
+	// ── Create: Optional Fields ──────────────────────────────────────
+	{
+		displayName: 'Additional Fields',
+		name: 'createAdditionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: {
+			show: { resource: ['template'], operation: ['create'] },
+		},
+		options: [
+			{
+				displayName: 'Message TTL (Seconds)',
+				name: 'messageSendTtlSeconds',
+				type: 'number',
+				default: 600,
+				typeOptions: { minValue: 1 },
+				description: 'How long Meta keeps trying to deliver a message sent with this template. Meta\'s allowed range depends on the category (useful for one-time codes).',
+			},
+		],
 	},
 
 	// ── Delete: All Languages ────────────────────────────────────────

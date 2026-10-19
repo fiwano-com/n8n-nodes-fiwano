@@ -106,11 +106,33 @@ export const messageFields: INodeProperties[] = [
 		name: 'variables',
 		type: 'json',
 		default: '',
-		description: 'Template variables as JSON. Positional: {"body":["val1","val2"]}. Named: {"body":{"name":"Pablo"}}. Omit if no variables.',
+		description: 'Template variables as JSON. Positional: {"body":["val1","val2"]}. Named: {"body":{"name":"Pablo"}}. Authentication: {"body":["123456"]} — the code also fills the copy-code button. Omit if no variables.',
 		typeOptions: { rows: 4 },
 		displayOptions: {
 			show: { resource: ['message'], operation: ['sendTemplate'] },
 		},
+	},
+
+	// ── Send Template: Optional Fields ───────────────────────────────
+	{
+		displayName: 'Additional Fields',
+		name: 'templateAdditionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: {
+			show: { resource: ['message'], operation: ['sendTemplate'] },
+		},
+		options: [
+			{
+				displayName: 'Header Media URL',
+				name: 'headerMediaUrl',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. https://my-bucket.s3.amazonaws.com/banner.jpg',
+				description: 'HTTPS URL of the header image, video or document. Required when the template header is media (variables.header_media in Template → Get), not allowed otherwise. Meta downloads the file, as in Send Media.',
+			},
+		],
 	},
 
 	// ── Send Media: Media Type ────────────────────────────────────────

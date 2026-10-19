@@ -362,6 +362,9 @@ async function executeMessage(
 			);
 		}
 		if ('value' in variables) body.variables = variables.value as IDataObject;
+		const extra = this.getNodeParameter('templateAdditionalFields', i, {}) as IDataObject;
+		const headerMediaUrl = String(extra.headerMediaUrl ?? '').trim();
+		if (headerMediaUrl) body.header_media_url = headerMediaUrl;
 		return fiwanoApiRequest.call(this, 'POST', '/messages/send-template', body);
 	}
 
@@ -449,6 +452,10 @@ async function executeTemplate(
 		};
 		if (parameterFormat) {
 			body.parameter_format = parameterFormat;
+		}
+		const createExtra = this.getNodeParameter('createAdditionalFields', i, {}) as IDataObject;
+		if (createExtra.messageSendTtlSeconds !== undefined) {
+			body.message_send_ttl_seconds = createExtra.messageSendTtlSeconds;
 		}
 		return fiwanoApiRequest.call(this, 'POST', `/channels/${pathSegment(channelId)}/templates`, body);
 	}
