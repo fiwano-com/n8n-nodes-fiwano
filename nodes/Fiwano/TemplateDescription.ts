@@ -92,13 +92,8 @@ export const templateFields: INodeProperties[] = [
 				default: '',
 				description: 'Filter templates by approval status',
 			},
-			{
-				displayName: 'Sync From Meta',
-				name: 'sync',
-				type: 'boolean',
-				default: true,
-				description: 'Whether to fetch the latest state from Meta before returning',
-			},
+			// `sync` was removed: the API refreshes templates from Meta on every read and
+			// ignores it. n8n drops a saved key of an undeclared collection option on load.
 		],
 	},
 

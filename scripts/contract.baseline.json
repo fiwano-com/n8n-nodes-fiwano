@@ -537,11 +537,6 @@
           ],
           "displayOptions": null
         },
-        "filters[operation=getAll,resource=template].sync": {
-          "type": "boolean",
-          "required": false,
-          "displayOptions": null
-        },
         "templateName[operation=create,resource=template]": {
           "type": "string",
           "required": true,

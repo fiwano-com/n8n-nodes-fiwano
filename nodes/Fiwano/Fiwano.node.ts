@@ -415,7 +415,6 @@ async function executeTemplate(
 		const filters = this.getNodeParameter('filters', i) as IDataObject;
 		const qs: IDataObject = {};
 		if (filters.status) qs.status = filters.status;
-		if (filters.sync !== undefined) qs.sync = String(filters.sync);
 		return fiwanoApiRequest.call(this, 'GET', `/channels/${pathSegment(channelId)}/templates`, undefined, qs);
 	}
 
