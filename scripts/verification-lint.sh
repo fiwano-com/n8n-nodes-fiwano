@@ -17,23 +17,51 @@
 #     scanner's off-overrides — the sort rule that rejected v1.3.0 lives here.
 #   * `allowInlineConfig: false` — the scanner IGNORES `// eslint-disable` comments,
 #     so we must too. An inline disable can never hide a scanner finding again.
-# Pinned to the scanner version so results are deterministic; the `--full` currency
-# gate in verify.sh fails the release if the pin drifts behind npm.
+# The Creator Portal always reviews with the LATEST scanner, so this mirrors the
+# latest too: the version is resolved from npm on every run, never pinned by
+# hand. Offline, a local run falls back to the last installed version (with a
+# warning); `--latest` (used by verify.sh --full) refuses to run without it.
 #
 #   ./scripts/verification-lint.sh            # lint the working tree
+#   ./scripts/verification-lint.sh --latest   # same, but the latest scanner is mandatory
 #   ./scripts/verification-lint.sh --refresh  # re-download the toolchain
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TOOLDIR="node_modules/.verification-lint"
-# The scanner version whose ruleset we mirror. Keep in sync with npm (verify.sh
-# --full checks this) and bump deliberately, re-running to catch new rules.
-SCANNER_VERSION="0.38.0"
+TOOLROOT="node_modules/.verification-lint"   # one subdirectory per scanner version
+REQUIRE_LATEST=0
+for arg in "$@"; do
+  case "$arg" in
+    --latest)  REQUIRE_LATEST=1 ;;
+    --refresh) rm -rf "$TOOLROOT" ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
 
-if [[ "${1:-}" == "--refresh" ]]; then rm -rf "$TOOLDIR"; fi
+# Pre-versioned layout (toolchain directly in TOOLROOT) — drop it.
+[[ -f "$TOOLROOT/package.json" ]] && rm -rf "$TOOLROOT"
 
+latest=$(npm view @n8n/scan-community-package@latest version 2>/dev/null | tr -d '[:space:]' || true)
+installed=$(ls -1 "$TOOLROOT" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+
+if [[ -n "$latest" ]]; then
+  SCANNER_VERSION="$latest"
+  echo "Scanner ruleset: @n8n/scan-community-package@$SCANNER_VERSION (latest on npm — what the Creator Portal uses)"
+elif [[ $REQUIRE_LATEST -eq 1 ]]; then
+  echo "Could not read the latest scanner version from npm (offline?). A release gate needs the latest ruleset." >&2
+  exit 2
+elif [[ -n "$installed" ]]; then
+  SCANNER_VERSION="$installed"
+  printf '\033[33mOffline: using the last installed scanner %s — the Portal may already run a newer one.\033[0m\n' "$SCANNER_VERSION"
+else
+  echo "Offline and no scanner installed yet — network required on first run." >&2
+  exit 2
+fi
+
+TOOLDIR="$TOOLROOT/$SCANNER_VERSION"
 if [[ ! -d "$TOOLDIR/node_modules/@n8n/scan-community-package" ]]; then
-  echo "Installing the verification scanner into $TOOLDIR (first run only)…"
+  echo "Installing the verification scanner $SCANNER_VERSION into $TOOLDIR…"
+  rm -rf "$TOOLDIR"
   mkdir -p "$TOOLDIR"
   cat > "$TOOLDIR/package.json" <<EOF
 { "name": "fiwano-verification-lint", "private": true, "version": "1.0.0" }
@@ -42,7 +70,9 @@ EOF
   # buildScanConfig resolves them from here — no version guessing on our side.
   (cd "$TOOLDIR" && npm install --silent --no-audit --no-fund \
       "@n8n/scan-community-package@$SCANNER_VERSION") \
-    || { echo "Install failed — network required on first run."; exit 2; }
+    || { rm -rf "$TOOLDIR"; echo "Install failed."; exit 2; }
+  # Keep only the version just installed.
+  find "$TOOLROOT" -mindepth 1 -maxdepth 1 ! -name "$SCANNER_VERSION" -exec rm -rf {} +
 fi
 
 # Runner: import the scanner's own config and lint OUR working tree with it.

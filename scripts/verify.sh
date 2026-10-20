@@ -124,40 +124,23 @@ console.log(\"   icon present; every path in package.json n8n.{nodes,credentials
 # 9. n8n's VERIFICATION ruleset against the working tree. This is the gate the
 #    Creator Portal applies; running it locally is the only way to see it before
 #    publishing, because the official scanner can only fetch from npm.
-gate "n8n verification ruleset (working tree)" ./scripts/verification-lint.sh
+#    The ruleset is the latest scanner on npm (the Portal's); --full requires it,
+#    a local run may fall back to the last installed one when offline.
+LINT_ARGS=()
+[[ $FULL -eq 1 ]] && LINT_ARGS=(--latest)
+gate "n8n verification ruleset (working tree)" ./scripts/verification-lint.sh "${LINT_ARGS[@]+"${LINT_ARGS[@]}"}"
 
 # 10. The official scanner itself. Network + slow, and it reads the PUBLISHED
 #     package, so it validates the last release rather than your working tree —
 #     keep it as a final confirmation, not as your feedback loop.
 if [[ $FULL -eq 1 ]]; then
-  # 9b. The verification ruleset our local gate (#9) mirrors is version-pinned in
-  #     verification-lint.sh. The Creator Portal applies whatever ruleset the
-  #     current @n8n/scan-community-package bundles, and that moves over time. If
-  #     our pin has drifted behind it, gate #9 silently checks the WRONG (older)
-  #     rules and a new rule can slip through to the Portal — exactly how v1.2.0
-  #     was rejected after publishing clean locally. Fail here so the pin gets
-  #     refreshed before release. Network-only, so it lives in --full.
-  gate "Verification ruleset is current" bash -c '
-    pinned=$(grep -oE "SCANNER_VERSION=\"[0-9.]+\"" scripts/verification-lint.sh | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
-    portal=$(npm view @n8n/scan-community-package@latest version 2>/dev/null | tr -d "[:space:]")
-    if [[ -z "$portal" ]]; then
-      printf "   could not read the scanner version from npm (offline?); skipping the drift check — the scanner gate below is the backstop\n"
-      exit 0
-    fi
-    printf "   pinned scanner=%s  latest @n8n/scan-community-package=%s\n" "$pinned" "$portal"
-    if [[ "$pinned" != "$portal" ]]; then
-      printf "   STALE: the Creator Portal scanner is now %s but the local mirror pins %s.\n" "$portal" "$pinned"
-      printf "   Fix: set SCANNER_VERSION=\"%s\" in scripts/verification-lint.sh, run\n" "$portal"
-      printf "   ./scripts/verification-lint.sh --refresh, resolve any new findings, then re-run.\n"
-      exit 1
-    fi
-    exit 0
-  '
-
   # The scanner exits 0 even when it reports errors, so its exit code is not a
   # gate. Parse the summary line instead.
   gate "Official n8n scanner (published package)" bash -c '
-    out=$(npx --yes @n8n/scan-community-package n8n-nodes-fiwano 2>&1)
+    # Pin the resolved latest explicitly: a bare npx may reuse an older cached copy.
+    v=$(npm view @n8n/scan-community-package@latest version 2>/dev/null | tr -d "[:space:]")
+    [[ -n "$v" ]] || { echo "   could not read the scanner version from npm"; exit 1; }
+    out=$(npx --yes "@n8n/scan-community-package@$v" n8n-nodes-fiwano 2>&1)
     printf "%s\n" "$out" | tail -25
     errs=$(printf "%s" "$out" | grep -oE "[0-9]+ error" | head -1 | grep -oE "[0-9]+")
     if [[ -n "$errs" && "$errs" -gt 0 ]]; then
