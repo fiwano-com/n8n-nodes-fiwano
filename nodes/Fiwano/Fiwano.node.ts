@@ -16,6 +16,7 @@ import {
 	fiwanoApiRequest,
 	fiwanoApiRequestBinary,
 	fiwanoSendFailedError,
+	interactiveBody,
 	isFailedSend,
 	pathSegment,
 	recipientProblem,
@@ -366,6 +367,43 @@ async function executeMessage(
 		const headerMediaUrl = String(extra.headerMediaUrl ?? '').trim();
 		if (headerMediaUrl) body.header_media_url = headerMediaUrl;
 		return fiwanoApiRequest.call(this, 'POST', '/messages/send-template', body);
+	}
+
+	if (operation === 'sendInteractive') {
+		const type = this.getNodeParameter('interactiveType', i) as string;
+		const input =
+			type === 'buttons' || type === 'quickReplies'
+				? (this.getNodeParameter('interactiveInput', i, 'fields') as string)
+				: undefined;
+		const json = input === 'json';
+		const { body, problem } = interactiveBody({
+			type,
+			input,
+			text: this.getNodeParameter('interactiveText', i, ''),
+			buttons:
+				type === 'buttons'
+					? this.getNodeParameter(json ? 'interactiveButtonsJson' : 'interactiveButtons', i, json ? '' : {})
+					: undefined,
+			quickReplies:
+				type === 'quickReplies'
+					? this.getNodeParameter(
+							json ? 'interactiveQuickRepliesJson' : 'interactiveQuickReplies',
+							i,
+							json ? '' : {},
+						)
+					: undefined,
+			cards: type === 'cards' ? this.getNodeParameter('interactiveCards', i, '') : undefined,
+			listButton: type === 'list' ? this.getNodeParameter('interactiveListButton', i, '') : undefined,
+			listSections: type === 'list' ? this.getNodeParameter('interactiveListSections', i, '') : undefined,
+		});
+		if (!body) {
+			throw new NodeOperationError(this.getNode(), problem ?? 'Nothing to send', { itemIndex: i });
+		}
+		return fiwanoApiRequest.call(this, 'POST', '/messages/send-interactive', {
+			channel_id: channelId,
+			recipient,
+			...body,
+		});
 	}
 
 	if (operation === 'sendMedia') {

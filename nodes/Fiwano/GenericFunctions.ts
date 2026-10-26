@@ -380,7 +380,12 @@ export async function fiwanoApiRequestBinary(
 // ── Send results ─────────────────────────────────────────────────────────────
 
 /** Message operations whose HTTP 200 carries the real outcome in `success`/`status`. */
-export const SEND_OPERATIONS: ReadonlySet<string> = new Set(['send', 'sendMedia', 'sendTemplate']);
+export const SEND_OPERATIONS: ReadonlySet<string> = new Set([
+	'send',
+	'sendInteractive',
+	'sendMedia',
+	'sendTemplate',
+]);
 
 /**
  * True when a send response reports a permanent failure.
@@ -470,7 +475,7 @@ export class FiwanoSendFailedError extends NodeOperationError {
 			itemIndex,
 			description:
 				sendFailureHint(code) ??
-				'Fiwano did not retry this send. Fix the cause before sending again; for Send Text and Send Media the channel owner also gets a delivery digest email.',
+				'Fiwano did not retry this send. Fix the cause before sending again; for Send Text, Send Media and Send Interactive the channel owner also gets a delivery digest email.',
 		});
 		this.response = response;
 	}
@@ -531,6 +536,116 @@ export function templateVariables(raw: unknown): { value?: unknown; invalid?: tr
 	}
 	if (typeof raw === 'object') return { value: raw };
 	return { invalid: true };
+}
+
+/** Parameters of Send Interactive, as read from the node. */
+export interface InteractiveInput {
+	type: string;
+	text: unknown;
+	/** `fields` (fixedCollection) or `json` (array) — buttons and quick replies only. */
+	input?: string;
+	buttons?: unknown;
+	quickReplies?: unknown;
+	cards?: unknown;
+	listButton?: unknown;
+	listSections?: unknown;
+}
+
+const CARDS_EXAMPLE =
+	'[{"image_url":"https://…","title":"…","buttons":[{"type":"reply","id":"…","title":"…"}]}]';
+const SECTIONS_EXAMPLE = '[{"title":"…","rows":[{"id":"…","title":"…"}]}]';
+const BUTTONS_EXAMPLE = '[{"type":"reply","id":"…","title":"…"}]';
+const QUICK_REPLIES_EXAMPLE = '[{"id":"…","title":"…"}]';
+
+/** A JSON-array parameter: a JSON string is parsed, an array from an expression is used as is. */
+function jsonArray(raw: unknown): unknown[] | undefined {
+	let value = raw;
+	if (typeof raw === 'string') {
+		if (raw.trim() === '') return undefined;
+		try {
+			value = JSON.parse(raw) as unknown;
+		} catch {
+			return undefined;
+		}
+	}
+	return Array.isArray(value) && value.length > 0 ? value : undefined;
+}
+
+/** Rows of a multi-value fixedCollection (`{ <option>: [...] }`). */
+function collectionRows(raw: unknown, option: string): IDataObject[] {
+	const rows = raw && typeof raw === 'object' ? (raw as IDataObject)[option] : undefined;
+	return Array.isArray(rows) ? (rows as IDataObject[]) : [];
+}
+
+/**
+ * Request body of Send Interactive minus `channel_id` / `recipient`, or the
+ * reason it cannot be built. Only shapes the request: limits and channel rules
+ * stay on the API (400 invalid_interactive_request with reason and hint, or a
+ * 422 naming the field), so the node never refuses what the API would accept
+ * beyond "nothing to send".
+ */
+export function interactiveBody(input: InteractiveInput): { body?: IDataObject; problem?: string } {
+	const body: IDataObject = {};
+	// The API rejects a blank text, and cards on Instagram/Messenger take none:
+	// an empty field means "no text".
+	const text = input.text === undefined || input.text === null ? '' : String(input.text);
+	if (text.trim()) body.text = text;
+
+	if (input.type === 'buttons' && input.input === 'json') {
+		const buttons = jsonArray(input.buttons);
+		if (!buttons) return { problem: `Buttons must be a non-empty JSON array, e.g. ${BUTTONS_EXAMPLE}` };
+		body.buttons = buttons as IDataObject[];
+		return { body };
+	}
+	if (input.type === 'quickReplies' && input.input === 'json') {
+		const quickReplies = jsonArray(input.quickReplies);
+		if (!quickReplies) {
+			return { problem: `Quick Replies must be a non-empty JSON array, e.g. ${QUICK_REPLIES_EXAMPLE}` };
+		}
+		body.quick_replies = quickReplies as IDataObject[];
+		return { body };
+	}
+	if (input.type === 'buttons') {
+		const buttons = collectionRows(input.buttons, 'button').map((button) => {
+			// Hidden fields keep what was typed before the type changed; send only
+			// the one the button type takes, so a stale value cannot fail the send.
+			const type = button.type === 'url' ? 'url' : 'reply';
+			const out: IDataObject = { type, title: String(button.title ?? '') };
+			if (type === 'url') out.url = String(button.url ?? '').trim();
+			else out.id = String(button.id ?? '');
+			return out;
+		});
+		if (buttons.length === 0) return { problem: 'Add at least one button' };
+		body.buttons = buttons;
+		return { body };
+	}
+	if (input.type === 'quickReplies') {
+		const quickReplies = collectionRows(input.quickReplies, 'quickReply').map((item) => ({
+			id: String(item.id ?? ''),
+			title: String(item.title ?? ''),
+		}));
+		if (quickReplies.length === 0) return { problem: 'Add at least one quick reply' };
+		body.quick_replies = quickReplies;
+		return { body };
+	}
+	if (input.type === 'cards') {
+		const cards = jsonArray(input.cards);
+		if (!cards) return { problem: `Cards must be a non-empty JSON array, e.g. ${CARDS_EXAMPLE}` };
+		body.cards = cards as IDataObject[];
+		return { body };
+	}
+	if (input.type === 'list') {
+		const sections = jsonArray(input.listSections);
+		if (!sections) {
+			return { problem: `List Sections must be a non-empty JSON array, e.g. ${SECTIONS_EXAMPLE}` };
+		}
+		body.list = {
+			button: input.listButton === undefined || input.listButton === null ? '' : String(input.listButton),
+			sections: sections as IDataObject[],
+		};
+		return { body };
+	}
+	return { problem: `Unknown interactive type: ${String(input.type)}` };
 }
 
 export function recipientProblem(recipient: unknown): { message: string; description: string } | undefined {

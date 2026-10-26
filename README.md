@@ -26,7 +26,7 @@ One license covers a slot bundle: **1 WhatsApp + 1 Instagram + 1 Facebook Messen
 | Tier | Monthly | Capabilities |
 |------|---------|-------------|
 | Starter | $12 | Text messages in/out and delivery statuses |
-| Pro | $19 | Everything in Starter + inbound media and files, outbound media via HTTPS URL (signed URLs supported), WhatsApp template management and sending |
+| Pro | $19 | Everything in Starter + inbound media and files, outbound media via HTTPS URL (signed URLs supported), interactive messages (buttons, cards, quick replies, lists), WhatsApp template management and sending |
 
 New accounts start with a **7-day free trial on the Pro tier** (full functionality).
 
@@ -41,7 +41,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 
 | Resource | Operations |
 |----------|-----------|
-| Message | Send Text, Send Media, Send Template (WhatsApp) |
+| Message | Send Text, Send Media, Send Interactive (buttons, cards, quick replies, list), Send Template (WhatsApp) |
 | Channel | Get Many, Get, Generate OAuth URL, Exchange OAuth Code, Update (webhook settings + subscription binding), Deactivate |
 | Media | Download (saves received file as binary data) |
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
@@ -254,6 +254,7 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.from }}` | Sender ID — use as `recipient` when replying |
 | `{{ $json.data.from_name }}` | Sender name (WhatsApp only; `null` on Instagram/Facebook) |
 | `{{ $json.data.text }}` | Message text (for `type: text` messages) |
+| `{{ $json.data.button_id }}` | Present only when the user tapped a button, quick reply or list row: the ID you set (see below) |
 | `{{ $json.data.type }}` | `text`, `image`, `audio`, `video`, `document`, `share`, or `unsupported` (see below) |
 | `{{ $json.data.reply_to.message_id }}` | Present when the user replied to a specific message: the id you already hold for it — your send's `message_id` (UUID) or the `data.message_id` of an earlier inbound message (see below) |
 | `{{ $json.data.reply_to.story.url }}` | Instagram reply to your story: the story media link; `reply_to.story.id`, `.expires_at`, `.link_url` alongside |
@@ -293,7 +294,9 @@ WhatsApp is unaffected — Meta already delivers each WhatsApp media message sep
 
 ### Button taps and menu choices
 
-When a user picks one of the options you offered — a WhatsApp template quick-reply button, a WhatsApp interactive button or list row, an Instagram/Messenger quick reply, or a Messenger/Instagram postback (Get Started, ice breakers, persistent menu) — it arrives as an ordinary `type: "text"` whose `data.text` is the label the user saw. One text branch handles typed answers and taps alike; there is no separate event and no machine id for the button. Which message the button belonged to is in `data.reply_to` (a WhatsApp template tap always quotes the template send, so `reply_to.message_id` is the `message_id` you got from **Message → Send Template**).
+When a user picks one of the options you offered, it arrives as an ordinary `type: "text"` whose `data.text` is the label the user saw and `data.button_id` is the option's ID. This covers buttons, quick replies and list rows sent with **Message → Send Interactive**, WhatsApp template quick-reply buttons, and Messenger/Instagram buttons configured outside Fiwano (Get Started, ice breakers, persistent menu). One text branch handles typed answers and taps alike; `data.button_id` tells them apart — it is present only on a tap.
+
+`data.button_id` is the ID you set in Send Interactive, or in Send Template for a quick-reply button (without one, the button text). For buttons configured outside Fiwano it is the payload set there. On WhatsApp, `data.reply_to.message_id` is the `message_id` you got from Send Interactive or Send Template, so you also know which send the tap answers. Instagram and Messenger do not report that — there `data.button_id` is how you recognise the tap.
 
 ### Replies — `data.reply_to`
 
@@ -375,14 +378,14 @@ Statuses and echoes are delivered independently and at-least-once — a status c
 
 ### Reading the send result
 
-All three send operations answer HTTP `200` even when the send fails, and report the
+All four send operations answer HTTP `200` even when the send fails, and report the
 outcome in the item's `success` and `status` fields:
 
 | `status` | `success` | What it means |
 |---|---|---|
 | `sent` | `true` | Meta accepted it. Track the rest via `message.delivered` / `read` / `failed` webhooks. |
 | `queued` | `true` | Meta did not give a final answer in time (transient failure, or a slow response — usually a large media download). Fiwano finishes the send in the background, retries transient failures (7 attempts over ~20 min), and emails the channel owner if they run out. Never resend a `queued` message yourself. Send Template is `queued` only when Meta answers slowly; a template is never retried or resent. |
-| `failed` | `false` | Not sent, and Fiwano will not retry it. `error` carries Meta's text and `error_code` Meta's code. For Send Text and Send Media the channel owner also receives a delivery digest email. |
+| `failed` | `false` | Not sent, and Fiwano will not retry it. `error` carries Meta's text and `error_code` Meta's code. For Send Text, Send Media and Send Interactive the channel owner also receives a delivery digest email. |
 
 `message_id` is a Fiwano UUID, not a Meta ID. Every later delivery-status webhook
 references that same UUID.
@@ -390,7 +393,7 @@ references that same UUID.
 #### Error on Failed Send
 
 What happens on `failed` is controlled by the **Error on Failed Send** option on the
-three send operations:
+four send operations:
 
 - **On** (default on node version 2 — what you get when adding a Fiwano node): the node fails with
   `Send failed: <Meta's text> (Meta error <code>)` and a hint on what to do. Handle it
@@ -436,7 +439,7 @@ advice from this table:
 | `131047` | Outside the 24h window (WhatsApp) | Switch to Send Template |
 | `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
 | `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
-| `131056`, `131057` | Send Template: too many messages to this recipient in a short time, or the WhatsApp Business account is in maintenance mode (Send Text / Send Media retry these and come back `queued`) | Wait, then send again |
+| `131056`, `131057` | Send Template: too many messages to this recipient in a short time, or the WhatsApp Business account is in maintenance mode (Send Text / Send Media / Send Interactive retry these and come back `queued`) | Wait, then send again |
 | `132000`, `132012` | Send Template: the variables do not match the template | Check the values and their count for each component |
 | `132001` | Send Template: Meta does not have this template approved in this language | Check the template name, language and status (Template → Get Many) |
 | `132015`, `132016` | Send Template: Meta paused or disabled the template (low quality) | Check it in WhatsApp Manager, or use another approved template |
@@ -467,6 +470,9 @@ These are ordinary node errors (HTTP `400`/`422`), independent of the option abo
   `data.recipient`, not `data.from` — there is no sender to reply to.
 - **Text** empty or whitespace-only → `422`; over the channel limit → `text_too_long`.
 - A WhatsApp send to the channel's own number → `recipient_equals_sender`.
+- An interactive message the channel does not have (quick replies on WhatsApp, a list on
+  Instagram/Messenger, mixed WhatsApp buttons, …) → `invalid_interactive_request`, with
+  the rule and the fix in the error description.
 
 ### Text message
 
@@ -480,6 +486,52 @@ Text: Hello!
 Per-channel length caps are WhatsApp 4096, Facebook 2000, Instagram 1000, and Fiwano does not auto-split. Empty text and invalid recipients are refused before Meta is called — see [Requests Fiwano refuses before calling Meta](#requests-fiwano-refuses-before-calling-meta).
 
 Sends are limited to **10 accepted sends per second per channel**, shared across all API keys; every other operation is limited to **20 requests per second per API key**. Exceeding either returns HTTP `429` with `Retry-After`, which the node surfaces in the error description.
+
+### Interactive message (buttons, cards, quick replies, list)
+
+Messages the user answers with a tap. **Requires a Pro license**, and like text they are sent inside the 24-hour window — outside it on WhatsApp, use a template with quick-reply buttons. Pick the **Type**; each channel gets its native message:
+
+| Type | What the user sees | WhatsApp | Instagram / Messenger |
+|---|---|---|---|
+| Buttons (1–3) | Text with buttons under it | Reply buttons, or exactly one URL button | Any mix of reply and URL |
+| Cards (1–10) | Picture, title, subtitle and buttons; 2+ scroll sideways | ✓ | ✓ |
+| Quick Replies (1–13) | Text with chips that disappear after a tap | — | ✓ |
+| List (up to 10 rows) | Text with a button that opens a list of options | ✓ | — |
+
+```
+Resource: Message → Operation: Send Interactive
+Channel ID: <channel_id>
+Recipient: {{ $('Fiwano Trigger').item.json.data.from }}
+Type: Buttons
+Message Text: Which size do you need?
+Buttons: Reply · Title "S" · ID size:S
+         Reply · Title "M" · ID size:M
+```
+
+A **Reply** button sends its title back as `message.received` with `data.button_id` = its **ID**; a **URL** button opens the link and sends nothing. Titles are up to 20 characters; IDs up to 256 and unique within the message. **Message Text** is required for buttons, quick replies and lists.
+
+**Buttons and quick replies from data.** Set **Specify Buttons** (or **Specify Quick Replies**) to **Using JSON** when the options come from earlier nodes or from an AI agent — the number of fields in the editor is fixed, a JSON array is not:
+
+```
+Buttons (JSON):        {{ $json.sizes.map(s => ({ type: 'reply', id: 'size:' + s, title: s })) }}
+Quick Replies (JSON):  [{"id": "colour:red", "title": "Red"}, {"id": "colour:blue", "title": "Blue"}]
+```
+
+**Cards** and **List Sections** are always JSON, like template components:
+
+```json
+[{"image_url": "https://cdn.example.com/rain-jacket.jpg", "title": "Rain Jacket", "subtitle": "$89 · sizes S–XL",
+  "buttons": [{"type": "reply", "id": "add_to_cart:SKU-1", "title": "Add to cart"},
+              {"type": "url", "title": "View on site", "url": "https://shop.example.com/p/1"}]}]
+```
+
+```json
+[{"title": "Delivery", "rows": [
+  {"id": "ship:express", "title": "Express", "description": "Tomorrow, $9"},
+  {"id": "ship:standard", "title": "Standard", "description": "3–5 days, free"}]}]
+```
+
+With cards, **Message Text** is required on WhatsApp for 2 or more cards and not accepted on Instagram and Messenger — send the text first with Send Text. On WhatsApp every card carries the same buttons. Meta downloads card images while the request waits, as with media, so keep them small; Instagram shows cards and quick replies only in the mobile app. A shape the channel does not have fails with HTTP `400` `invalid_interactive_request`, whose reason and hint the node shows — Fiwano never sends something other than you asked for. Full rules: [Interactive messages](https://fiwano.com/documentation/sending-messages#interactive-messages).
 
 ### WhatsApp template
 
@@ -496,6 +548,7 @@ Variables: {"body": ["John", "ORD-456"]}
 
 Variable format:
 - **Positional** (numbered `{{1}}`, `{{2}}`): `{"body": ["val1", "val2"], "header": ["val"], "buttons": [{"index": 0, "value": "abc"}]}`
+- **Quick-reply button ID**: `{"buttons": [{"index": 0, "id": "confirm:ORD-123"}]}` — returned as `data.button_id` when the user taps that button (without it, `button_id` is the button text). `value` stays for the variable of a URL or copy-code button
 - **Named** (custom keys): `{"body": {"customer_name": "John"}}`
 - **Authentication** (one-time code): `{"body": ["482913"]}` — the code also fills the copy-code button
 - Leave empty if the template has no variables

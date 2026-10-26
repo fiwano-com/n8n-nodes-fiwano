@@ -52,6 +52,7 @@
           "required": false,
           "optionValues": [
             "send",
+            "sendInteractive",
             "sendMedia",
             "sendTemplate"
           ],
@@ -475,6 +476,281 @@
           "type": "string",
           "required": false,
           "displayOptions": null
+        },
+        "interactiveType[operation=sendInteractive,resource=message]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "buttons",
+            "cards",
+            "list",
+            "quickReplies"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ]
+            }
+          }
+        },
+        "interactiveText[interactiveType=buttons|list|quickReplies,operation=sendInteractive,resource=message]": {
+          "type": "string",
+          "required": true,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "buttons",
+                "list",
+                "quickReplies"
+              ]
+            }
+          }
+        },
+        "interactiveText[interactiveType=cards,operation=sendInteractive,resource=message]": {
+          "type": "string",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "cards"
+              ]
+            }
+          }
+        },
+        "interactiveInput[interactiveType=buttons,operation=sendInteractive,resource=message]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "fields",
+            "json"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "buttons"
+              ]
+            }
+          }
+        },
+        "interactiveInput[interactiveType=quickReplies,operation=sendInteractive,resource=message]": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "fields",
+            "json"
+          ],
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "quickReplies"
+              ]
+            }
+          }
+        },
+        "interactiveButtons[interactiveInput=fields,interactiveType=buttons,operation=sendInteractive,resource=message]": {
+          "type": "fixedCollection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "buttons"
+              ],
+              "interactiveInput": [
+                "fields"
+              ]
+            }
+          }
+        },
+        "interactiveButtons[interactiveInput=fields,interactiveType=buttons,operation=sendInteractive,resource=message].button.type": {
+          "type": "options",
+          "required": false,
+          "optionValues": [
+            "reply",
+            "url"
+          ],
+          "displayOptions": null
+        },
+        "interactiveButtons[interactiveInput=fields,interactiveType=buttons,operation=sendInteractive,resource=message].button.title": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "interactiveButtons[interactiveInput=fields,interactiveType=buttons,operation=sendInteractive,resource=message].button.id[type=reply]": {
+          "type": "string",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "type": [
+                "reply"
+              ]
+            }
+          }
+        },
+        "interactiveButtons[interactiveInput=fields,interactiveType=buttons,operation=sendInteractive,resource=message].button.url[type=url]": {
+          "type": "string",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "type": [
+                "url"
+              ]
+            }
+          }
+        },
+        "interactiveQuickReplies[interactiveInput=fields,interactiveType=quickReplies,operation=sendInteractive,resource=message]": {
+          "type": "fixedCollection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "quickReplies"
+              ],
+              "interactiveInput": [
+                "fields"
+              ]
+            }
+          }
+        },
+        "interactiveQuickReplies[interactiveInput=fields,interactiveType=quickReplies,operation=sendInteractive,resource=message].quickReply.title": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "interactiveQuickReplies[interactiveInput=fields,interactiveType=quickReplies,operation=sendInteractive,resource=message].quickReply.id": {
+          "type": "string",
+          "required": false,
+          "displayOptions": null
+        },
+        "interactiveButtonsJson[interactiveInput=json,interactiveType=buttons,operation=sendInteractive,resource=message]": {
+          "type": "json",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "buttons"
+              ],
+              "interactiveInput": [
+                "json"
+              ]
+            }
+          }
+        },
+        "interactiveQuickRepliesJson[interactiveInput=json,interactiveType=quickReplies,operation=sendInteractive,resource=message]": {
+          "type": "json",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "quickReplies"
+              ],
+              "interactiveInput": [
+                "json"
+              ]
+            }
+          }
+        },
+        "interactiveCards[interactiveType=cards,operation=sendInteractive,resource=message]": {
+          "type": "json",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "cards"
+              ]
+            }
+          }
+        },
+        "interactiveListButton[interactiveType=list,operation=sendInteractive,resource=message]": {
+          "type": "string",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "list"
+              ]
+            }
+          }
+        },
+        "interactiveListSections[interactiveType=list,operation=sendInteractive,resource=message]": {
+          "type": "json",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "message"
+              ],
+              "operation": [
+                "sendInteractive"
+              ],
+              "interactiveType": [
+                "list"
+              ]
+            }
+          }
         },
         "errorOnSendFailure[@version=2,resource=message]": {
           "type": "boolean",

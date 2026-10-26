@@ -24,6 +24,7 @@ const {
 	FiwanoSendFailedError,
 	SEND_OPERATIONS,
 	fiwanoApiError,
+	interactiveBody,
 	isFailedSend,
 	pathSegment,
 	recipientProblem,
@@ -50,8 +51,8 @@ check('sent / queued are successes, failed is a failure', () => {
 	assert.equal(isFailedSend({}), false);
 });
 
-check('only the three send operations are classified', () => {
-	assert.deepEqual([...SEND_OPERATIONS].sort(), ['send', 'sendMedia', 'sendTemplate']);
+check('only the four send operations are classified', () => {
+	assert.deepEqual([...SEND_OPERATIONS].sort(), ['send', 'sendInteractive', 'sendMedia', 'sendTemplate']);
 });
 
 // ── sendFailureHint ──────────────────────────────────────────────────────────
@@ -102,7 +103,7 @@ check('send failure without error text or code still produces a usable message',
 	const err = new FiwanoSendFailedError(NODE, { success: false, status: 'failed' }, 0);
 	assert.equal(err.message.startsWith('Send failed: Meta rejected the message'), true);
 	assert.match(err.description ?? '', /did not retry/);
-	assert.match(err.description ?? '', /Send Text and Send Media/);
+	assert.match(err.description ?? '', /Send Text, Send Media and Send Interactive/);
 });
 
 // ── recipientProblem — the strict subset of the API preflight ────────────────
@@ -195,6 +196,73 @@ check('template variables: string parsed, object passed, empty omitted, junk inv
 	assert.deepEqual(templateVariables(obj), { value: obj });
 	assert.deepEqual(templateVariables('{not json'), { invalid: true });
 	assert.deepEqual(templateVariables(42), { invalid: true });
+});
+
+// ── interactiveBody ──────────────────────────────────────────────────────────
+check('interactive buttons: each type sends only its own field, text kept as typed', () => {
+	const { body, problem } = interactiveBody({
+		type: 'buttons',
+		text: 'Which size?',
+		buttons: {
+			button: [
+				{ type: 'reply', id: 'size:S', title: 'S', url: 'https://stale.example' },
+				{ type: 'url', id: 'stale', title: 'Size chart', url: ' https://shop.example/chart ' },
+			],
+		},
+	});
+	assert.equal(problem, undefined);
+	assert.deepEqual(body, {
+		text: 'Which size?',
+		buttons: [
+			{ type: 'reply', title: 'S', id: 'size:S' },
+			{ type: 'url', title: 'Size chart', url: 'https://shop.example/chart' },
+		],
+	});
+});
+
+check('interactive: blank text is omitted (cards on IG/FB take none), empty collections refused', () => {
+	const cards = [{ image_url: 'https://x/a.jpg', title: 'A', buttons: [{ type: 'url', title: 'Go', url: 'https://x' }] }];
+	assert.deepEqual(interactiveBody({ type: 'cards', text: '  ', cards: JSON.stringify(cards) }).body, { cards });
+	assert.deepEqual(interactiveBody({ type: 'cards', text: undefined, cards }).body, { cards });
+	assert.match(interactiveBody({ type: 'buttons', text: 'x', buttons: {} }).problem, /at least one button/);
+	assert.match(interactiveBody({ type: 'quickReplies', text: 'x', quickReplies: { quickReply: [] } }).problem, /at least one quick reply/);
+});
+
+check('interactive quick replies and list map to the API shape', () => {
+	assert.deepEqual(
+		interactiveBody({ type: 'quickReplies', text: 'Colour?', quickReplies: { quickReply: [{ title: 'Red', id: 'c:red' }] } }).body,
+		{ text: 'Colour?', quick_replies: [{ id: 'c:red', title: 'Red' }] },
+	);
+	const sections = [{ title: 'Delivery', rows: [{ id: 'ship:x', title: 'Express' }] }];
+	assert.deepEqual(
+		interactiveBody({ type: 'list', text: 'How?', listButton: 'Options', listSections: JSON.stringify(sections) }).body,
+		{ text: 'How?', list: { button: 'Options', sections } },
+	);
+});
+
+check('interactive buttons / quick replies as JSON: string parsed, array from an expression passed as is', () => {
+	const buttons = [{ type: 'reply', id: 'size:S', title: 'S' }];
+	assert.deepEqual(
+		interactiveBody({ type: 'buttons', input: 'json', text: 'Size?', buttons: JSON.stringify(buttons) }).body,
+		{ text: 'Size?', buttons },
+	);
+	const quickReplies = [{ id: 'c:red', title: 'Red' }, { id: 'c:blue', title: 'Blue' }];
+	assert.deepEqual(
+		interactiveBody({ type: 'quickReplies', input: 'json', text: 'Colour?', quickReplies }).body,
+		{ text: 'Colour?', quick_replies: quickReplies },
+	);
+	assert.match(interactiveBody({ type: 'buttons', input: 'json', text: 'x', buttons: '' }).problem, /Buttons must be a non-empty JSON array/);
+	assert.match(interactiveBody({ type: 'quickReplies', input: 'json', text: 'x', quickReplies: '{}' }).problem, /Quick Replies must be a non-empty JSON array/);
+	// Fields mode stays the default when the mode is absent.
+	assert.match(interactiveBody({ type: 'buttons', text: 'x', buttons: '[]' }).problem, /at least one button/);
+});
+
+check('interactive JSON fields: invalid, non-array or empty input is refused with an example', () => {
+	for (const cards of ['', '{not json', '{"title":"x"}', '[]', 42, { a: 1 }]) {
+		assert.match(interactiveBody({ type: 'cards', text: '', cards }).problem, /Cards must be a non-empty JSON array/);
+	}
+	assert.match(interactiveBody({ type: 'list', text: 'x', listButton: 'O', listSections: '' }).problem, /List Sections/);
+	assert.match(interactiveBody({ type: 'carousel', text: 'x' }).problem, /Unknown interactive type/);
 });
 
 console.log(`   ${checks} checks passed`);
