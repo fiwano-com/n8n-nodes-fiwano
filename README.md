@@ -601,7 +601,13 @@ Supported types per channel:
 **Stickers.** Choose Media Type `sticker`. On WhatsApp fill Media URL with a WebP;
 on Facebook leave it empty and fill **Sticker ID**. The wrong field for the channel
 (or any sticker on Instagram) returns HTTP 400 `invalid_media_request` before Meta is
-called. Caption and Filename are ignored for stickers.
+called.
+
+**Caption and Filename are WhatsApp fields.** Caption is shown under an image, video
+or document, Filename names a document. Anywhere else they are accepted and ignored:
+a WhatsApp audio or sticker has no caption, and on Instagram and Messenger the file
+arrives on its own, named after its URL. To add text there, send it with Send Text
+before or after the file.
 
 **Handling errors.** A media send that Meta rejects follows the same rules as text —
 see [Reading the send result](#reading-the-send-result). The media-specific codes are
