@@ -2,7 +2,8 @@
 /**
  * Regression for the send-result helpers (GenericFunctions):
  * `isFailedSend`, `sendFailureHint`, `FiwanoSendFailedError`, `recipientProblem`,
- * plus the structured-detail rendering of `fiwanoApiError`.
+ * plus the structured-detail rendering of `fiwanoApiError` and the Media → Download
+ * file name (`contentDispositionFilename`).
  *
  * These decide whether a rejected send turns the node red, what the error says,
  * and which recipients are refused before a request is made. The recipient
@@ -23,6 +24,7 @@ const { NodeOperationError } = require('n8n-workflow');
 const {
 	FiwanoSendFailedError,
 	SEND_OPERATIONS,
+	contentDispositionFilename,
 	fiwanoApiError,
 	interactiveBody,
 	isFailedSend,
@@ -263,6 +265,32 @@ check('interactive JSON fields: invalid, non-array or empty input is refused wit
 	}
 	assert.match(interactiveBody({ type: 'list', text: 'x', listButton: 'O', listSections: '' }).problem, /List Sections/);
 	assert.match(interactiveBody({ type: 'carousel', text: 'x' }).problem, /Unknown interactive type/);
+});
+
+check('media download name: filename* wins over the ASCII fallback, both forms of the API header', () => {
+	// The API's two shapes (GET /media/{id}): a name that needs no encoding, and
+	// an ASCII fallback followed by the exact UTF-8 name.
+	assert.equal(contentDispositionFilename('attachment; filename="data.json"'), 'data.json');
+	assert.equal(
+		contentDispositionFilename(
+			"attachment; filename=\"____ ____ (1).docx\"; filename*=utf-8''%D1%82%D0%B5%D1%81%D1%82%20%D1%84%D0%B0%D0%B9%D0%BB%20%281%29.docx",
+		),
+		'тест файл (1).docx',
+	);
+	// The API before the fallback was added sent filename* alone.
+	assert.equal(contentDispositionFilename("attachment; filename*=utf-8''%D1%82%D0%B5%D1%81%D1%82-1.pdf"), 'тест-1.pdf');
+	// Order does not matter, the parameter name is case-insensitive, spaces around `=` are allowed.
+	assert.equal(contentDispositionFilename("attachment; FILENAME*= UTF-8''a%20b.txt; filename=a_b.txt"), 'a b.txt');
+	assert.equal(contentDispositionFilename("attachment; filename*=iso-8859-1'en'caf%E9.txt"), 'café.txt');
+	// A quoted value may contain `;` and escaped quotes.
+	assert.equal(contentDispositionFilename('attachment; filename="a;b \\"c\\".txt"'), 'a;b "c".txt');
+	assert.equal(contentDispositionFilename('attachment; filename=plain.pdf'), 'plain.pdf');
+	// Broken or unknown filename* falls back to filename.
+	assert.equal(contentDispositionFilename("attachment; filename=\"x.pdf\"; filename*=utf-8''%E0%A4%A.pdf"), 'x.pdf');
+	assert.equal(contentDispositionFilename("attachment; filename=\"x.pdf\"; filename*=koi8-r''%D4.pdf"), 'x.pdf');
+	for (const none of [undefined, '', 'attachment', 'inline', 'attachment; filename=""', 42, ['attachment; filename=a']]) {
+		assert.equal(contentDispositionFilename(none), undefined);
+	}
 });
 
 console.log(`   ${checks} checks passed`);

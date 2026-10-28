@@ -336,6 +336,42 @@ export async function fiwanoApiRequest(
 }
 
 /**
+ * The file name from a `Content-Disposition` header (RFC 6266). `filename*`
+ * (RFC 5987: `charset'language'percent-encoded`) wins over `filename`, which the
+ * API sends as an ASCII fallback with other characters replaced by `_`. A quoted
+ * value may contain `;`. Undefined when neither parameter yields a name.
+ */
+export function contentDispositionFilename(header: unknown): string | undefined {
+	if (typeof header !== 'string') return undefined;
+	const params: Record<string, string> = {};
+	for (const m of header.matchAll(/;\s*([^\s=;]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^;]*)/g)) {
+		const key = m[1].toLowerCase();
+		let value = m[2].trim();
+		if (value.startsWith('"')) value = value.slice(1, -1).replace(/\\(.)/g, '$1');
+		if (!(key in params)) params[key] = value;
+	}
+
+	const extended = /^([^']*)'[^']*'(.+)$/.exec(params['filename*'] ?? '');
+	if (extended) {
+		const charset = extended[1].toLowerCase();
+		let name: string | undefined;
+		try {
+			if (charset === 'utf-8' || charset === '') {
+				name = decodeURIComponent(extended[2]);
+			} else if (charset === 'iso-8859-1') {
+				name = extended[2].replace(/%([0-9a-f]{2})/gi, (_, hex: string) =>
+					String.fromCharCode(parseInt(hex, 16)),
+				);
+			}
+		} catch {
+			// Malformed percent-encoding: fall back to `filename`.
+		}
+		if (name?.trim()) return name.trim();
+	}
+	return params.filename?.trim() || undefined;
+}
+
+/**
  * Download a binary media file from Fiwano (GET /media/{media_id}).
  * Returns the raw buffer, MIME type, and optional filename from response headers.
  */
@@ -361,14 +397,7 @@ export async function fiwanoApiRequestBinary(
 		const mimeType =
 			response.headers['content-type']?.split(';')[0].trim() ?? 'application/octet-stream';
 
-		let fileName: string | undefined;
-		const contentDisposition = response.headers['content-disposition'];
-		if (contentDisposition) {
-			const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-			if (match?.[1]) {
-				fileName = match[1].replace(/['"]/g, '').trim() || undefined;
-			}
-		}
+		const fileName = contentDispositionFilename(response.headers['content-disposition']);
 
 		return { buffer: Buffer.from(response.body), mimeType, fileName };
 	} catch (error) {
