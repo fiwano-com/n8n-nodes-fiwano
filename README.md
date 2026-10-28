@@ -43,7 +43,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 |----------|-----------|
 | Message | Send Text, Send Media, Send Interactive (buttons, cards, quick replies, list), Send Template (WhatsApp) |
 | Channel | Get Many, Get, Generate OAuth URL, Exchange OAuth Code, Update (webhook settings + subscription binding), Deactivate |
-| Media | Download (saves received file as binary data) |
+| Media | Download (saves received file as binary data, named as the original file) |
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
 | Redirect URI | Get Many, Add, Delete |
@@ -262,15 +262,15 @@ Key fields available in expressions after the trigger:
 | `{{ $json.data.share.url }}` | On `type: "share"` — link to the shared post / reel / story; `share.expires_at` is set for story mentions only |
 | `{{ $json.data.media.media_id }}` | ID to download file via `GET /api/v1/media/{media_id}` (Pro license) |
 | `{{ $json.data.media.voice }}` | `true` for WhatsApp voice messages (boolean, WA only; omitted for IG/FB) |
-| `{{ $json.data.media.sticker }}` | `true` when the image is a sticker (WhatsApp WebP, Facebook); omitted for ordinary photos |
+| `{{ $json.data.media.sticker }}` | `true` when the image is a sticker (WhatsApp WebP, Facebook); omitted for ordinary photos. Instagram stickers arrive as plain GIF images without it |
 | `{{ $json.data.media.sticker_id }}` | Facebook only — Meta's sticker id; send it back with Media Type `sticker` |
-| `{{ $json.data.media.download_url }}` | Authenticated download URL — fetch with your `X-API-Key`. `null` if download from Meta failed. **Cannot be used directly as `media_url` for outbound sends** — re-host the bytes first. |
+| `{{ $json.data.media.download_url }}` | Authenticated download URL — fetch with your `X-API-Key`. `null` if the file is unavailable: the download from Meta failed or the file is over 10 MB (`file_size` still shows its real size). Any file type is delivered. **Cannot be used directly as `media_url` for outbound sends** — re-host the bytes first. |
 | `{{ $json.data.media.mime_type }}` | MIME type of the received file |
 | `{{ $json.data.media.file_size }}` | File size in bytes |
-| `{{ $json.data.media.filename }}` | Original filename (documents only; `null` otherwise) |
+| `{{ $json.data.media.filename }}` | Original filename (documents only; `null` otherwise). On Facebook Messenger it is the name as Meta delivers it — spaces become `-`, some punctuation is dropped |
 | `{{ $json.data.media.duration_ms }}` | Duration in ms (audio/video only; `null` otherwise) |
 | `{{ $json.data.media.expires_at }}` | ISO 8601 expiry timestamp — file deleted after this time |
-| `{{ $json.data.media.error }}` | Present only when Fiwano could not download the file from Meta; `download_url` is then `null` |
+| `{{ $json.data.media.error }}` | Present only when the file is unavailable (the download from Meta failed, or the file is over 10 MB); `download_url` is then `null` |
 | `{{ $json.data.caption }}` | Text the user wrote together with media or a share (all channels). Plain text messages use `data.text` instead |
 | `{{ $json.data.referral.text }}` | (beta) Present when the conversation started from an ad or an m.me / ig.me link: the ad copy the user saw; `referral.source`, `.image_url`, `.ref`, `.raw` alongside (see [Referral context](#referral-context--ads-and-links-beta)) |
 | `{{ $json.data.unsupported_type }}` | On `type: "unsupported"` — what Meta actually sent (see below) |
@@ -334,7 +334,7 @@ Full contract: [Receiving Messages → Referral context](https://fiwano.com/docu
 
 ### `type: "unsupported"`
 
-`data.type` is `text`, `image`, `audio`, `video`, `document`, `share` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true`. `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
+`data.type` is `text`, `image`, `audio`, `video`, `document`, `share` or `unsupported` — never a raw provider value, so it is safe to switch on (treat a value you do not know like `unsupported`). A sticker is an `image` with `data.media.sticker: true` (WhatsApp, Facebook; on Instagram a plain GIF image). `unsupported` means Fiwano cannot hand you the content as a file, and `data.unsupported_type` says what it was. Two cases, told apart by `upgrade_required`:
 
 | Case | Looks like | What to do |
 |---|---|---|
