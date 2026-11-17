@@ -78,25 +78,56 @@ fi
 # Runner: import the scanner's own config and lint OUR working tree with it.
 cat > "$TOOLDIR/scan-lint.mjs" <<'EOF'
 import { ESLint } from 'eslint';
-import { buildScanConfig } from '@n8n/scan-community-package/scanner/scanner.mjs';
 
-// Same knobs the scanner uses (scanner.mjs): its exact merged config, and inline
+// The scanner module moved between releases (scanner/scanner.mjs, then the
+// compiled dist/scanner.js). Try the known locations, newest first.
+let scanner;
+for (const entry of ['dist/scanner.js', 'scanner/scanner.mjs']) {
+  try {
+    scanner = await import(`@n8n/scan-community-package/${entry}`);
+    break;
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+  }
+}
+if (!scanner?.buildScanConfig) {
+  console.error('Cannot locate buildScanConfig in this scanner release — update scripts/verification-lint.sh.');
+  process.exit(2);
+}
+
+// The legs the Portal lints. Since the scanner exports SOURCE_FILE_PATTERNS it
+// lints the attested SOURCE (node/credential sources + package.json) and,
+// separately, the shipped build (compiled .js + package.json). Older releases
+// linted only the package; the source leg is what we ran then.
+const legs = scanner.SOURCE_FILE_PATTERNS
+  ? [
+      ['source', scanner.SOURCE_FILE_PATTERNS],
+      ['build', ['dist/**/*.js', 'package.json']],
+    ]
+  : [['source', ['nodes/**/*.ts', 'credentials/**/*.ts', 'package.json']]];
+
+// Same knobs the scanner uses: its exact merged config, and inline
 // eslint-disable directives ignored. cwd is the project root so the config's
 // `**/nodes/**` / `**/credentials/**` / `package.json` globs match our files.
 const eslint = new ESLint({
   cwd: process.cwd(),
   allowInlineConfig: false,
   overrideConfigFile: true,
-  overrideConfig: await buildScanConfig(),
+  overrideConfig: await scanner.buildScanConfig(),
+  errorOnUnmatchedPattern: false,
 });
+const formatter = await eslint.loadFormatter('stylish');
 
-const results = await eslint.lintFiles(['nodes/**/*.ts', 'credentials/**/*.ts', 'package.json']);
-const output = await (await eslint.loadFormatter('stylish')).format(results);
-if (output.trim()) console.log(output);
-
-const errors = results.reduce((n, r) => n + r.errorCount, 0);
-const warnings = results.reduce((n, r) => n + r.warningCount, 0);
-console.log(`\nScanner-mirror lint: ${errors} error(s), ${warnings} warning(s).`);
+let errors = 0;
+let warnings = 0;
+for (const [label, patterns] of legs) {
+  const results = await eslint.lintFiles(patterns);
+  const output = await formatter.format(results);
+  if (output.trim()) console.log(`[${label}]${output}`);
+  errors += results.reduce((n, r) => n + r.errorCount, 0);
+  warnings += results.reduce((n, r) => n + r.warningCount, 0);
+}
+console.log(`\nScanner-mirror lint (${legs.map(([l]) => l).join(' + ')}): ${errors} error(s), ${warnings} warning(s).`);
 // Fail on warnings too: the Portal review has rejected on warnings before
 // (v1.2.0 icon warnings), and the repo's standard is a clean 0/0.
 process.exit(errors > 0 || warnings > 0 ? 1 : 0);
