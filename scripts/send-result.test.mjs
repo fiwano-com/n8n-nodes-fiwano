@@ -31,6 +31,7 @@ const {
 	pathSegment,
 	recipientProblem,
 	sendFailureHint,
+	subscriptionStatusFilter,
 	templateVariables,
 } = require(join(ROOT, 'dist/nodes/Fiwano/GenericFunctions.js'));
 
@@ -71,6 +72,7 @@ check('known Meta codes get a hint, unknown ones none, string codes accepted', (
 	assert.match(sendFailureHint(190), /Reconnect/);
 	assert.match(sendFailureHint(133010), /WhatsApp Business App/);
 	assert.match(sendFailureHint(131042), /Meta billing/);
+	assert.match(sendFailureHint(131000), /send it again/);
 	// 131057 is maintenance mode, not the closed 24h window. A `failed` with it
 	// comes from Send Template (text/media are retried), so no "no action" advice.
 	assert.doesNotMatch(sendFailureHint(131057), /template|24-hour|no action/i);
@@ -173,6 +175,17 @@ check('structured detail without message still falls back to JSON, without hint 
 	const mapped = fiwanoApiError(NODE, e, 'fallback');
 	assert.equal(mapped.message, 'Fiwano API error (HTTP 402): {"code":"pro_required"}');
 	assert.match(mapped.description ?? '', /subscription/i);
+});
+
+// ── subscriptionStatusFilter ─────────────────────────────────────────────────
+check('subscription status filter: array or comma string, trimmed, empty means none', () => {
+	assert.deepEqual(subscriptionStatusFilter(['active']), ['active']);
+	assert.deepEqual(subscriptionStatusFilter(['active', 'expired']), ['active', 'expired']);
+	assert.deepEqual(subscriptionStatusFilter(' Active , expired,'), ['active', 'expired']);
+	assert.deepEqual(subscriptionStatusFilter([]), []);
+	assert.deepEqual(subscriptionStatusFilter(''), []);
+	assert.deepEqual(subscriptionStatusFilter(undefined), []);
+	assert.deepEqual(subscriptionStatusFilter(['', 7, 'canceled']), ['canceled']);
 });
 
 // ── pathSegment ──────────────────────────────────────────────────────────────

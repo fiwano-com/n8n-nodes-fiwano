@@ -1064,6 +1064,30 @@
               ]
             }
           }
+        },
+        "filters[operation=getAll,resource=subscription]": {
+          "type": "collection",
+          "required": false,
+          "displayOptions": {
+            "show": {
+              "resource": [
+                "subscription"
+              ],
+              "operation": [
+                "getAll"
+              ]
+            }
+          }
+        },
+        "filters[operation=getAll,resource=subscription].status": {
+          "type": "multiOptions",
+          "required": false,
+          "optionValues": [
+            "active",
+            "canceled",
+            "expired"
+          ],
+          "displayOptions": null
         }
       }
     },

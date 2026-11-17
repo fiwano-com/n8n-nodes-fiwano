@@ -20,6 +20,7 @@ import {
 	isFailedSend,
 	pathSegment,
 	recipientProblem,
+	subscriptionStatusFilter,
 	templateVariables,
 } from './GenericFunctions';
 import { channelOperations, channelFields } from './ChannelDescription';
@@ -146,7 +147,7 @@ export class Fiwano implements INodeType {
 				} else if (resource === 'redirect') {
 					responseData = await executeRedirect.call(this, operation, i);
 				} else if (resource === 'subscription') {
-					responseData = await executeSubscription.call(this, operation);
+					responseData = await executeSubscription.call(this, operation, i);
 				} else {
 					throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);
 				}
@@ -306,9 +307,14 @@ async function executeChannel(
 async function executeSubscription(
 	this: IExecuteFunctions,
 	operation: string,
+	i: number,
 ): Promise<IDataObject> {
 	if (operation === 'getAll') {
-		return fiwanoApiRequest.call(this, 'GET', '/subscriptions');
+		const filters = this.getNodeParameter('filters', i, {}) as IDataObject;
+		const qs: IDataObject = {};
+		const status = subscriptionStatusFilter(filters.status);
+		if (status.length > 0) qs.status = status;
+		return fiwanoApiRequest.call(this, 'GET', '/subscriptions', undefined, qs);
 	}
 	throw new NodeOperationError(this.getNode(), `Unknown subscription operation: ${operation}`);
 }

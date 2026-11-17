@@ -322,6 +322,9 @@ export async function fiwanoApiRequest(
 	}
 	if (qs && Object.keys(qs).length > 0) {
 		options.qs = qs;
+		// The API reads a repeated parameter (`?status=active&status=expired`); n8n's
+		// default `indices` would send `status[0]=…`, which the API does not accept.
+		options.arrayFormat = 'repeat';
 	}
 
 	try {
@@ -451,6 +454,8 @@ export function sendFailureHint(errorCode: unknown): string | undefined {
 			return 'This person cannot be messaged right now (they blocked the Page, closed the chat, or never messaged it). Only they can lift it — do not resend automatically.';
 		case 803:
 			return 'Meta does not know this recipient. Check the identifier.';
+		case 131000:
+			return 'WhatsApp reported an internal error at Meta ("Something went wrong"). Nothing to fix in the request: send it again.';
 		case 131026:
 			return 'The recipient is not reachable on WhatsApp. Verify the number.';
 		case 131042:
@@ -546,6 +551,21 @@ const RECIPIENT_HELP =
  */
 export function pathSegment(value: unknown): string {
 	return encodeURIComponent(String(value).trim());
+}
+
+/**
+ * Subscription → Get Many's Status filter as the list sent in `?status=`.
+ * The editor gives an array; an expression may give one status or a
+ * comma-separated string. Values are trimmed and lowercased; empty ones are
+ * dropped, so an empty result means "no filter" (every subscription). Unknown
+ * statuses are passed through for the API to reject with its own `422`.
+ */
+export function subscriptionStatusFilter(raw: unknown): string[] {
+	const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+	return values
+		.filter((v): v is string => typeof v === 'string')
+		.map((v) => v.trim().toLowerCase())
+		.filter((v) => v.length > 0);
 }
 
 /**

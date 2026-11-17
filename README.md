@@ -47,7 +47,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
 | Redirect URI | Get Many, Add, Delete |
-| Subscription | Get Many (subscriptions, assigned channels, available slots by channel type and tier) |
+| Subscription | Get Many (subscriptions with an optional status filter, assigned channels, available slots by channel type and tier) |
 
 ### Trigger node — events
 
@@ -163,6 +163,7 @@ Each subscription grants **one slot per channel type** — one WhatsApp, one Ins
 - `available_slots.<channel_type>.total > 0` means a **new** channel of that type can be connected.
 - It does **not** gate reconnecting an inactive channel: a deactivated channel keeps its slot, and that reserved slot is what lets you bring it back.
 - `assigned_channels` shows which channel sits in each slot. The reverse lookup is `subscription.id` on the channel itself in **Channel → Get Many**.
+- By default the list includes expired and canceled subscriptions. Add **Filters → Status** to narrow it — it starts with *Active*, the subscriptions that can carry channels. The filter narrows `subscriptions` and `total` only; `active_total` and `available_slots` always describe the whole account.
 
 **Generate OAuth URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
 
@@ -439,6 +440,7 @@ advice from this table:
 | `131047` | Outside the 24h window (WhatsApp) | Switch to Send Template |
 | `131052` | Meta could not download from `media_url` | URL unreachable, expired signature, or wrong Content-Type — verify the URL works in a fresh request |
 | `131053` | Format/size unsupported, or Meta rate-limited your hosting provider's network | Retry; if persistent, use AWS S3 / GCS / Cloudflare R2 |
+| `131000` | WhatsApp: an internal error at Meta (*Something went wrong*). Send Text / Send Media / Send Interactive retry it and come back `queued` | Nothing to fix; send again |
 | `131056`, `131057` | Send Template: too many messages to this recipient in a short time, or the WhatsApp Business account is in maintenance mode (Send Text / Send Media / Send Interactive retry these and come back `queued`) | Wait, then send again |
 | `132000`, `132012` | Send Template: the variables do not match the template | Check the values and their count for each component |
 | `132001` | Send Template: Meta does not have this template approved in this language | Check the template name, language and status (Template → Get Many) |
