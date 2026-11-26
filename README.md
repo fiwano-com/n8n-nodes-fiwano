@@ -47,7 +47,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
 | Redirect URI | Get Many, Add, Delete |
-| Subscription | Get Many (subscriptions with an optional status filter, assigned channels, available slots by channel type and tier) |
+| Subscription | Get Many (subscriptions with an optional status filter, the channels on each, available slots by channel type and tier, credit balance of a prepaid subscription) |
 
 ### Trigger node — events
 
@@ -160,12 +160,14 @@ workflow that checks `health.status` can alert you. See
 
 Each subscription grants **one slot per channel type** — one WhatsApp, one Instagram, one Facebook. Use **Subscription → Get Many** to see what is free:
 
-- `available_slots.<channel_type>.total > 0` means a **new** channel of that type can be connected.
+- `available_slots.<channel_type>.total` is how many more channels of that type can be connected right now; `> 0` means a **new** one can.
 - It does **not** gate reconnecting an inactive channel: a deactivated channel keeps its slot, and that reserved slot is what lets you bring it back.
-- `assigned_channels` shows which channel sits in each slot. The reverse lookup is `subscription.id` on the channel itself in **Channel → Get Many**.
-- By default the list includes expired and canceled subscriptions. Add **Filters → Status** to narrow it — it starts with *Active*, the subscriptions that can carry channels. The filter narrows `subscriptions` and `total` only; `active_total` and `available_slots` always describe the whole account.
+- `channels` on each subscription lists every channel bound to it, connected or not. The reverse lookup is `subscription.id` on the channel itself in **Channel → Get Many**. (`assigned_channels`, the older per-slot view, is deprecated — read `channels`.)
+- By default the list includes expired, canceled and frozen subscriptions. Add **Filters → Status** to narrow it — it starts with *Active*, the subscriptions that can carry channels. The filter narrows `subscriptions` and `total` only; `active_total` and `available_slots` always describe the whole account.
 
-**Generate OAuth URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
+**Prepaid subscriptions** (`source: "prepaid"`) have no slots: one holds any number of channels of each type and is charged in credits per day. Its `prepaid` object carries `balance_credits` and `daily_cost_credits`, `expires_at` is a forecast of how long the balance lasts, and `assigned_channels` is `null`. Its credits are shared by all channel types, so the `available_slots` numbers of different types do not add up. See [Prepaid subscriptions](https://fiwano.com/documentation/subscriptions#prepaid-subscriptions).
+
+**Generate OAuth URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. When a prepaid subscription would take the channel, the error is `402` `insufficient_credits` (buy credits, then retry) or `409` `channel_limit_reached` (the limit for that type is reached); the same errors come from **Channel → Update** when you move a channel onto a prepaid subscription. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
 
 **Deactivate is a soft delete.** It stops the channel sending and receiving, but keeps its ID, history and **its subscription slot**. Deactivating alone does not free a slot.
 

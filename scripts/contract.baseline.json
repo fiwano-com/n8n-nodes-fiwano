@@ -1085,7 +1085,8 @@
           "optionValues": [
             "active",
             "canceled",
-            "expired"
+            "expired",
+            "frozen"
           ],
           "displayOptions": null
         }

@@ -11,7 +11,7 @@ export const subscriptionOperations: INodeProperties = {
 			name: 'Get Many',
 			value: 'getAll',
 			action: 'Get many subscriptions',
-			description: 'Retrieve subscriptions and available channel slots',
+			description: 'Retrieve subscriptions, the channels on each, and how many more channels of each type can be connected',
 		},
 	],
 	default: 'getAll',
@@ -40,6 +40,11 @@ export const subscriptionFields: INodeProperties[] = [
 					},
 					{ name: 'Canceled', value: 'canceled' },
 					{ name: 'Expired', value: 'expired' },
+					{
+						name: 'Frozen',
+						value: 'frozen',
+						description: 'A prepaid subscription paused by Fiwano: no daily charges, no new channels',
+					},
 				],
 				default: ['active'],
 				description:

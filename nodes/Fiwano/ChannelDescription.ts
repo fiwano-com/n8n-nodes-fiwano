@@ -23,7 +23,7 @@ export const channelOperations: INodeProperties = {
 			name: 'Generate OAuth URL',
 			value: 'setupUrl',
 			action: 'Generate a channel setup link',
-			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min. Fails with 402 when the account has no active subscription, and with 409 when every subscription slot of that type is taken (the error names the channels holding them).',
+			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min. Fails with 402 when the account has no active subscription, and with 409 when every subscription slot of that type is taken (the error names the channels holding them). When a prepaid subscription would take the channel, it fails with 402 insufficient_credits or 409 channel_limit_reached instead.',
 		},
 		{
 			name: 'Get',
@@ -187,7 +187,8 @@ export const channelFields: INodeProperties[] = [
 				default: '',
 				placeholder: 'e.g. a1b2c3d4e5f67890',
 				description:
-					'Move the channel to another subscription (use an ID from Subscription → Get Many). ' +
+					'Move the channel to another subscription (use an ID from Subscription → Get Many), ' +
+					'including a prepaid subscription, which holds any number of channels of each type. ' +
 					'An empty value is ignored — to unbind, use Release Subscription Slot instead. ' +
 					'Moving is reversible and causes no downtime, but moving to a Starter subscription ' +
 					'stops media and template sending immediately.',
