@@ -36,7 +36,7 @@ export class FiwanoApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			description:
-				'Optional. A default HMAC-SHA256 webhook secret reused across this account. The Fiwano Trigger uses it (when its own Webhook Secret field is empty) to verify incoming signatures and, in auto-setup mode, to register on your channels. The Exchange OAuth Code / Update operations also fall back to it when you leave their secret empty. Leave blank if you set secrets per-operation instead.',
+				'Optional. A default HMAC-SHA256 webhook secret reused across this account. The Fiwano Trigger uses it (when its own Webhook Secret field is empty) to verify incoming signatures and, in auto-setup mode, to register on your channels. The Exchange Setup Code / Update operations also fall back to it when you leave their secret empty. Leave blank if you set secrets per-operation instead.',
 		},
 	];
 

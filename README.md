@@ -42,7 +42,7 @@ New accounts start with a **7-day free trial on the Pro tier** (full functionali
 | Resource | Operations |
 |----------|-----------|
 | Message | Send Text, Send Media, Send Interactive (buttons, cards, quick replies, list), Send Template (WhatsApp) |
-| Channel | Get Many, Get, Generate OAuth URL, Exchange OAuth Code, Update (webhook settings + subscription binding), Deactivate |
+| Channel | Get Many, Get, Generate Setup URL, Exchange Setup Code, Update (webhook settings + subscription binding), Deactivate |
 | Media | Download (saves received file as binary data, named as the original file) |
 | Contact | Get Profile (Instagram, Facebook — enriches sender with name, profile picture, follower count) |
 | Template | Get Many, Get, Create, Update, Delete (WhatsApp only) |
@@ -107,7 +107,7 @@ To bake it into a custom image instead, follow n8n's [community-node installatio
 
 1. [Sign up at fiwano.com](https://fiwano.com/auth/login) and create an API key in **API Keys**
 2. In n8n: **Credentials → Add → Fiwano API** → paste the key (starts with `mip_live_`)
-3. *(Optional)* Set a **Webhook Secret** on the credential to reuse one HMAC secret across all workflows — the trigger and the **Exchange OAuth Code** / **Update** operations fall back to it when their own secret field is empty.
+3. *(Optional)* Set a **Webhook Secret** on the credential to reuse one HMAC secret across all workflows — the trigger and the **Exchange Setup Code** / **Update** operations fall back to it when their own secret field is empty.
 
 All Fiwano action nodes use this credential. The **Fiwano Trigger** node works without credentials in manual mode (it only verifies the webhook signature you configure per-channel). Add the same credential to the trigger **only** if you want it to auto-register its webhook on your channels — see [Setting Up the Trigger](#setting-up-the-trigger-webhooks).
 
@@ -120,19 +120,19 @@ Two ways to connect a channel — pick based on **whose** channel it is:
 - **Your own channels** → the [Fiwano portal](https://fiwano.com) UI (no code). Simplest when you just need your own WhatsApp / Instagram / Facebook in your automation.
 - **Your customers' channels** → the API (the nodes below, or the [Connect a Channel workflow](#example-workflows)). This embeds a "connect your channel" step into your own product, so an external client authorizes their own Meta account through *your* interface — they never need a Fiwano account.
 
-The API flow is Facebook OAuth, run once per channel (WhatsApp number / Instagram account / Facebook Page):
+The API flow runs once per channel (WhatsApp number / Instagram account / Facebook Page). The user connects the channel in Meta's window: Embedded Signup for WhatsApp, Facebook Login for Business for Instagram and Facebook.
 
-1. Add a **Fiwano** node → Resource: **Channel** → Operation: **Generate OAuth URL**
+1. Add a **Fiwano** node → Resource: **Channel** → Operation: **Generate Setup URL**
    - Select channel type, provide your redirect URI (must be registered via **Redirect URI → Add**)
    - Run the node → copy the `setup_url` from the output
-2. Open that URL in a browser and authorize the page(s)
-3. Add another **Fiwano** node → **Channel → Exchange OAuth Code**
+2. Open that URL in a browser and connect the channel in Meta's window
+3. Add another **Fiwano** node → **Channel → Exchange Setup Code**
    - Paste the `code` from the redirect URL query parameter — it is single-use and short-lived, so exchange it promptly
    - On failure the redirect carries `error` instead: `access_denied` (user cancelled or did not complete the Meta dialog), `slot_occupied` (the user connected a *different* Meta account than the one holding your subscription slot — `message` names the channel to reconnect or release), `session_expired` (the setup URL expired; generate a new one) or `setup_failed` (anything else). **Branch on `error` only** — the companion `message` is free-form English for display and may change
    - Optionally set `webhook_url` and `webhook_secret` in Additional Fields
 4. The response contains `channel_id` — save it for all subsequent nodes
 
-The same **Generate OAuth URL** operation also **reconnects** an inactive channel — there is no separate reconnect operation. Run the flow again for the same Meta account and Fiwano updates the existing channel, so **Exchange OAuth Code** returns the channel ID you already stored.
+The same **Generate Setup URL** operation also **reconnects** an inactive channel — there is no separate reconnect operation. Run the flow again for the same Meta account and Fiwano updates the existing channel, so **Exchange Setup Code** returns the channel ID you already stored.
 
 Alternatively, manage everything from the [Fiwano portal](https://fiwano.com) UI.
 
@@ -152,7 +152,7 @@ Every channel returned by **Channel → Get** and **Channel → Get Many** carri
 the account or number (access or a permission revoked, a WhatsApp number removed, an
 account blocked by Meta); `health.reason` is Meta's error text and `health.since` when it
 was detected. The channel stays active, but sends may fail until the cause is fixed in
-Meta or the same account is connected again with **Generate OAuth URL**. A scheduled
+Meta or the same account is connected again with **Generate Setup URL**. A scheduled
 workflow that checks `health.status` can alert you. See
 [Channel health](https://fiwano.com/documentation/channels#channel-health).
 
@@ -167,7 +167,7 @@ Each subscription grants **one slot per channel type** — one WhatsApp, one Ins
 
 **Prepaid subscriptions** (`source: "prepaid"`) have no slots: one holds any number of channels of each type and is charged in credits per day. Its `prepaid` object carries `balance_credits` and `daily_cost_credits`, `expires_at` is a forecast of how long the balance lasts, and `assigned_channels` is `null`. Its credits are shared by all channel types, so the `available_slots` numbers of different types do not add up. See [Prepaid subscriptions](https://fiwano.com/documentation/subscriptions#prepaid-subscriptions).
 
-**Generate OAuth URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. When a prepaid subscription would take the channel, the error is `402` `insufficient_credits` (buy credits, then retry) or `409` `channel_limit_reached` (the limit for that type is reached); the same errors come from **Channel → Update** when you move a channel onto a prepaid subscription. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
+**Generate Setup URL** tells you when a connect cannot go ahead: HTTP `402` means the account has no active subscription at all; HTTP `409` means subscriptions exist but every slot of that channel type is taken — the error lists the channels holding them, so you know what to reconnect or release. When a prepaid subscription would take the channel, the error is `402` `insufficient_credits` (buy credits, then retry) or `409` `channel_limit_reached` (the limit for that type is reached); the same errors come from **Channel → Update** when you move a channel onto a prepaid subscription. (In the API a *subscription* is what the portal's Billing page calls a *license* — same thing.)
 
 **Deactivate is a soft delete.** It stops the channel sending and receiving, but keeps its ID, history and **its subscription slot**. Deactivating alone does not free a slot.
 
@@ -176,8 +176,8 @@ To actually replace a channel, release the slot in a second step with **Channel 
 ```
 Channel → Deactivate            (channel_id = old channel)
 Channel → Update                (channel_id = old channel, Release Subscription Slot = true)
-Channel → Generate OAuth URL    (user connects the new Meta account)
-Channel → Exchange OAuth Code   (new channel takes the freed slot)
+Channel → Generate Setup URL    (user connects the new Meta account)
+Channel → Exchange Setup Code   (new channel takes the freed slot)
 ```
 
 Setting **Subscription ID** to an actual ID instead **moves** the channel to that subscription — no downtime, and the channel does not have to be deactivated first. An empty Subscription ID is ignored; releasing is always the explicit toggle.
@@ -371,7 +371,7 @@ A `message.echo` event uses the same envelope as every other event; the `data` b
 
 #### Tracking delivery/read status for echoes
 
-By default an echo is a one-off copy with no `delivered`/`read` follow-ups. To get the same status lifecycle echoes as messages you send through Fiwano, turn on **Track Echo Statuses** on the channel via **Channel → Update** (or **Exchange OAuth Code**) — it maps to the API's `echo_statuses`. Subsequent `message.delivered` / `message.read` / `message.failed` webhooks then reference the same echo `message_id` and are filtered by your Event Types exactly like ordinary statuses.
+By default an echo is a one-off copy with no `delivered`/`read` follow-ups. To get the same status lifecycle echoes as messages you send through Fiwano, turn on **Track Echo Statuses** on the channel via **Channel → Update** (or **Exchange Setup Code**) — it maps to the API's `echo_statuses`. Subsequent `message.delivered` / `message.read` / `message.failed` webhooks then reference the same echo `message_id` and are filtered by your Event Types exactly like ordinary statuses.
 
 Statuses and echoes are delivered independently and at-least-once — a status can occasionally arrive **before** the echo it belongs to. Correlate by `message_id` and upsert rather than relying on arrival order. WhatsApp/Facebook deliver both `delivered` and `read`; Instagram delivers only `read` (Meta does not provide `delivered`).
 
@@ -665,8 +665,8 @@ Two ready-made flows live in the [`workflows/`](./workflows/) directory. They as
 
 **After importing, finish setup before the workflow will run:**
 1. Add your **Fiwano API** credential to the nodes that use it (see [Credentials](#credentials)).
-2. For `fiwano-connect-channels.json`, add the OAuth-callback node's **Production URL** to your whitelisted redirect URIs (**Redirect URI → Add**, or in the [portal](https://fiwano.com)).
-3. **Activate** the workflow — the trigger and the OAuth-callback webhook only fire while the workflow is active.
+2. For `fiwano-connect-channels.json`, add the **Setup Callback** node's **Production URL** to your whitelisted redirect URIs (**Redirect URI → Add**, or in the [portal](https://fiwano.com)).
+3. **Activate** the workflow — the trigger and the Setup Callback webhook only fire while the workflow is active.
 
 On **self-hosted** n8n you can also import from the command line, run on the machine where n8n is installed (the `--input` path is relative to your current directory; the workflow is imported **inactive** — activate it in the UI afterwards):
 ```bash

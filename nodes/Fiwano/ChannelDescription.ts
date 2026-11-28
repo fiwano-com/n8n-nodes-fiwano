@@ -14,16 +14,16 @@ export const channelOperations: INodeProperties = {
 			description: 'Stop a channel sending and receiving. This is a soft delete: the channel ID, its history and its subscription slot are kept so the same Meta account can be reconnected later.',
 		},
 		{
-			name: 'Exchange OAuth Code',
+			name: 'Exchange Setup Code',
 			value: 'exchangeCode',
 			action: 'Exchange a setup code for channel data',
-			description: 'Exchange a one-time code from the OAuth redirect for channel data',
+			description: 'Exchange the one-time code from the setup redirect for channel data',
 		},
 		{
-			name: 'Generate OAuth URL',
+			name: 'Generate Setup URL',
 			value: 'setupUrl',
 			action: 'Generate a channel setup link',
-			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one (WhatsApp Embedded Signup or Meta OAuth). Valid until the returned expires_at — currently 60 min. Fails with 402 when the account has no active subscription, and with 409 when every subscription slot of that type is taken (the error names the channels holding them). When a prepaid subscription would take the channel, it fails with 402 insufficient_credits or 409 channel_limit_reached instead.',
+			description: 'Generate a setup URL to connect a new channel, or to reconnect an inactive one. The user connects the channel in Meta\'s window: Embedded Signup for WhatsApp, Facebook Login for Business for Instagram and Facebook. Valid until the returned expires_at — currently 60 min. Fails with 402 when the account has no active subscription, and with 409 when every subscription slot of that type is taken (the error names the channels holding them). When a prepaid subscription would take the channel, it fails with 402 insufficient_credits or 409 channel_limit_reached instead.',
 		},
 		{
 			name: 'Get',
@@ -61,7 +61,7 @@ export const channelFields: INodeProperties[] = [
 		},
 	},
 
-	// ── Generate OAuth URL ───────────────────────────────────────────
+	// ── Generate Setup URL ───────────────────────────────────────────
 	{
 		displayName: 'Channel Type',
 		name: 'channelType',
@@ -73,7 +73,7 @@ export const channelFields: INodeProperties[] = [
 		],
 		default: 'whatsapp',
 		required: true,
-		description: 'The type of channel to connect via OAuth',
+		description: 'The type of channel to connect',
 		displayOptions: {
 			show: { resource: ['channel'], operation: ['setupUrl'] },
 		},
@@ -85,20 +85,20 @@ export const channelFields: INodeProperties[] = [
 		default: '',
 		required: true,
 		placeholder: 'https://yourapp.com/callback',
-		description: 'Where users land after OAuth — must be registered via Redirect URI → Add',
+		description: 'Where users land after connecting — must be registered via Redirect URI → Add',
 		displayOptions: {
 			show: { resource: ['channel'], operation: ['setupUrl'] },
 		},
 	},
 
-	// ── Exchange OAuth Code ──────────────────────────────────────────
+	// ── Exchange Setup Code ──────────────────────────────────────────
 	{
-		displayName: 'OAuth Code',
+		displayName: 'Setup Code',
 		name: 'code',
 		type: 'string',
 		default: '',
 		required: true,
-		description: 'The one-time code from the OAuth redirect (?code=…). Expires in 5 minutes, single-use.',
+		description: 'The one-time code from the setup redirect (?code=…). Expires in 5 minutes, single-use.',
 		displayOptions: {
 			show: { resource: ['channel'], operation: ['exchangeCode'] },
 		},

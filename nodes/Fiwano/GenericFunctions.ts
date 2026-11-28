@@ -208,7 +208,7 @@ function describeDetail(detail: unknown): string | undefined {
 		// JSON is only the fallback for shapes without one.
 		const message = typeof record.message === 'string' ? record.message.trim() : '';
 		if (!message) return safeStringify(detail);
-		// `no_free_slot` (409 on Generate OAuth URL) names the channels holding the
+		// `no_free_slot` (409 on Generate Setup URL) names the channels holding the
 		// subscription slots; without them the author cannot tell what to release.
 		const occupiedBy = Array.isArray(record.occupied_by)
 			? (record.occupied_by as unknown[]).filter((id): id is string => typeof id === 'string')

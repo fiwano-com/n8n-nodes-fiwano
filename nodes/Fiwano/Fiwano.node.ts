@@ -588,7 +588,7 @@ async function executeRedirect(
 /**
  * Read the optional default Webhook Secret stored on the Fiwano API credential.
  * Returns '' when no credential is attached or the field is empty. Used so the
- * Exchange OAuth Code / Update operations can fall back to a single
+ * Exchange Setup Code / Update operations can fall back to a single
  * account-wide secret instead of requiring it on every node.
  */
 async function credentialWebhookSecret(this: IExecuteFunctions): Promise<string> {

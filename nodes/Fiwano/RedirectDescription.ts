@@ -11,7 +11,7 @@ export const redirectOperations: INodeProperties = {
 			name: 'Add',
 			value: 'add',
 			action: 'Add a redirect URI',
-			description: 'Register an allowed OAuth redirect URI',
+			description: 'Register an allowed redirect URI for the channel connect flow',
 		},
 		{
 			name: 'Delete',
@@ -23,7 +23,7 @@ export const redirectOperations: INodeProperties = {
 			name: 'Get Many',
 			value: 'getAll',
 			action: 'Get many redirects',
-			description: 'List many allowed OAuth redirect URIs for your API key',
+			description: 'List many allowed redirect URIs for your API key',
 		},
 	],
 	default: 'getAll',
